@@ -1,7 +1,7 @@
 ---
-title: "CPLN 6750 - Urban Growth Modeling, 2023"
-author: "Ken Steif, 2019. Eds. Michael Fichman & Jenna Epstein"
-date: "4/17/2023"
+title: "CPLN 6750 - Urban Growth Modeling, 2025"
+author: "Michael Fichman, Ken Steif & Jenna Epstein"
+date: "3/26/2025"
 output:
   html_document:
     toc: true
@@ -27,82 +27,138 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 </style>
 
-MF notes - 2025 edits
 
-Take the functions and stash them in a sepearate .R file.
+_There is a very cool lineage for this class module. It is inspired by the California Urban Futures Model, developed by Prof. Emeritus John Landis as what he called a "reduced form" model. Prof Landis taught his version of this methodology when I was his student. Years later, I team-taught this class with the late Prof. Ken Steif, who was another student of John's. We adapted the approach to be done in R, and use more explicitly spatial features. Ken wrote about it in an unpublished chapter from his book "Public Policy Analytics". I include some of Ken's unpublished writing here in its original form._
 
-Explain what they are and what the arguments are, but don't show them, that simplifies things.
+_This workflow will form the backbone of your fifth and final assignment for CPLN 6750. You will build a growth model based on a logistic regression that predicts the probability of land cover change across space over a specified time interval. Land cover change is hypothesized here to be a function of a) Existing land cover, b) The location of infrastructure and c) Demographic and economic spatial variables._
 
-Make the workflow correspond to a more present-day time period that is the same as the assignment - 2009-2019 perhaps.
+_For the first time in this class, you will have the option of conducting this workflow entirely in R._
 
-Set up an introduction that describes the workflow in bullet points.
+_Thanks very much to Jenna Epstein for editing this material._
 
-Remove spatial CV - too advanced for 675
-
-Change to workflow so that it's bringing in lc data from both years, identifying change etc., This is the cleaning routine students will be doing.
-
-_This markdown is an updated version of a module written by Ken Steif in 2019. It was an unpublished chapter from his book Public Policy Analytics, and it is therefore very detailed. It has been updated to keep it aligned with current packages and the data sources have been updated for the course github. For the most part, the original text is still used here, out of respect for the original material and the author. However, alterations, annotations and supplemental code are throughout._
-
-_This workflow will form the backbone of your fifth and final assignment for this class. You will build a growth model based on a binary logistic regression that predicts the probability of land cover change at a raster cell level over a specified interval as a function of a) Existing land cover, b) The location of infrastructure and c) Demographic and economic spatial variables._
-
-_While we have used logistic regression to model spatial phenomena like flooding before, this workflow is different in that we wrangle raster data in R rather than doing it in ArcGIS. You do not need to understand the code in full detail, but rather, you should understand what it does operationally, and think about how you can plug in new data from a different time window, in a different geographic context._
-
-_The appendices to this document add some additional code and alternative code blocks to what is in the chapter itself. You can use these to augment the workflow to run entirely in R and load, downsample and wrangle rasters._
-
-_Thanks very much to Jenna Epstein for helping to update and edit this material in 2022._
-
-_Michael Fichman, April, 2023_
+_Michael Fichman, March, 2025_
 
 
 # 1. Introduction
 
-Regional urban development is an emergent outcome resulting from the autonomous decisions of many different agents, including developers, real estate buyers and tenants as well as planners and regulators. Each of these groups optimize for a different set of bottom lines. Developers seek profit, buying land at a low price, improving on that land, and selling it at a premium. Households and firms consume housing and commercial real estate balancing price constraints with access to amenities and customers, respectively.
+*"Patterns of regional development emerge from the autonomous decisions of many different agents - including developers, real estate buyers and tenants as well as planners and regulators. Each of these groups optimize for a different set of bottom lines. Developers seek profit, buying land at a low price, improving on that land, and selling it at a premium. Households and firms consume housing and commercial real estate balancing price constraints with access to amenities and customers, respectively.*
 
-Planners regulate development by trading-off economic growth with the mitigation of negative externalities toward the goal of economic and environmental sustainability. Houston, the focus of this chapter, is a case study in managing these trade-offs. A sprawling Metropolitan area larger than the state of New Jersey, Houston’s _laissez-faire_ approach to planning was exploited in the wake of Hurricane Harvey which ultimately cost the region $125 billion. Out of concern for either safety, economic necessity or both, climate change is forcing cities like Houston to reconsider the role of land use planning.
+*"Planners regulate development by trading-off economic growth with the mitigation of negative externalities toward the goal of economic and environmental sustainability. Houston, the focus of this chapter, is a case study in managing these trade-offs. A sprawling Metropolitan area larger than the state of New Jersey, Houston’s laissez-faire approach to planning was exploited in the wake of Hurricane Harvey which ultimately cost the region $125 billion. Out of concern for either safety, economic necessity or both, climate change is forcing cities like Houston to reconsider the role of land use planning.*
 
-Land use planning that is both economically productive and sustainable requires both supply and demand-side insights. Specifically, the Planner must understand future demand for development and how that demand contrasts with the supply of environmentally sensitive land. The goal of this chapter is to model this interplay.
+*"Land use planning that is both economically productive and sustainable requires both supply and demand-side insights. Specifically, the Planner must understand future demand for development and how that demand contrasts with the supply of environmentally sensitive land. The goal of this chapter is to model this interplay....*
 
-The next section wrangles a host of datasets including, Land Cover and Land Cover Change from the USGS, Census demographics, and transportation. Spatial lag features are also engineered from the land cover change data hypothesizing that the time/space scale of development between 2000 and 2010 can help predict new development in 2020.
+*"At the center of our model is a hypothesis that development demand must in part, be a function of the pattern of existing development. Development occurs where the market believes a higher and better use may bring an investment return. In the case of sprawling region like Houston, assuming the requisite demand, there is a clear return on investment for converting farmland to suburban housing.*
 
-Exploratory analysis is undertaken to investigate the relationship between development and the aforementioned features. Findings then motivate the estimation of a geospatial predictive model trained on new development between 2001 and 2011. Those dynamics are then harnessed to predict Development_Demand for 2020 - predictions interpreted as the probability of new development here. The goal is not to create the most accurate model, but to demonstrate the role for geospatial machine learning in the land use modeling process.
+*"The traditional ‘bid-rent’ economic model of development posits that development demand is a function of accessibility. This model works well in cities where centralized locations offer the most accessibility. However, it assumes that all consumers of land share the same preferences for central city access. While urban land is valuable, contemporary urbanism in regions like Houston show us that suburban locations can be quite desirable as well.*
 
-Once predictions are validated for their accuracy and spatial generalizability, we evaluate their confluence with environmentally sensitive land in counties throughout the region, with particular emphasis on landscape fragmentation. The final section uses predictions to ‘allocate’ new development across to places where growth can have an economic impact without impeding sustainability goals.
+*"Why is that? Hinterland locations do not offer direct access to jobs and cultural amenities. Instead, residents trade-off accessibility for larger lots and bigger homes; as well as a bundle of public services like school quality. Developers are attracted to suburban and exurban locations because of cheap land on ‘greenfield’ sites like farms and open space.*
+
+*"The demand for greenfield development can vary substantially depending on the existing spatial configuration of development. If accessibility to central locations was the only underlying consideration, developers would sprawl directly out to the periphery... As a space/time process, this would look much like spilled milk, emanating from a central point outward across the kitchen table.*
+
+*"Another option for developers is to move beyond the periphery onto greenfield sites that are cheaper because they are even less accessible. In this case, the space/time process looks small ‘patches’ of new development dotting the landscape and “leapfrogging” from one greenfield to the next. The economic incentive is to always develop beyond the periphery, where land is cheapest. There are some real costs to this model however. For one, when development is so diffuse, it is more burdensome to efficiently deploy infrastructure like roads, sewers and electicity. Second, leapfrog development fragments natural areas reducing biodiversity and stressing the natural habitat of species that need continuous open space to thrive.*
+
+*"In Houston, as in many sprawling regions of the U.S. the economic incentives that underlie sprawl likely encourage both the accessibility and leapfrog models of development. For our purposes however, features must be created to associate these patterns with development. Without them, the model may lack the appropriate spatial experience on which to forecast growth.*
+
+*"To keep it simple, we develop features associated with accessibility-based patterns. In reality, the analyst should develop a series of applicable features and test which best associate with the outcome of interest. The problem becomes infinitely more difficult when one realizes that sprawl patterns may differ throughout the study area - if for instance, land use restrictions varied by county. Below we estimate models using logistic regression, but higher level machine learning algorithms, most notably, Random Forest, are more adept at dealing with non-linearities across space.*
+
+*- Ken Steif, 2019*
+
+We want to create a model that is accurate, but also useful. How can a forecast inform our planning intelligence? Can we understand where sensitive lands might be at risk? Can we understand where interventions - such as upzoning - might allow us to accommodate likely demand while minimizing sprawl? Can we estimate the impacts of new infrastructure before it's built? We will generate a basic model that will let us analyze alternative futures and think about interventions to shape that future.
 
 # 1.2. The Workflow
 
-The goal of this analysis is to predict the likelihood of land cover change in the Houston MSA from *undeveloped* to *developed* in year *t* based on demographic, infrastructural, and land cover information from ten years previous (*t-10*). Once calibrated, this model can then be used to take like information from year *t* and project land cover changes in year *t+10*.
+The goal of this analysis is to predict the likelihood of land cover change in the Houston MSA from *undeveloped* to *developed* over a certain time interval based on demographic, infrastructural, and environmental information from a baseline year roughly ten years previous (*t1*). We train a binomial logit model using information from year *t1* and project land cover changes over a roughly ten year interval for year *t2*. By feeding identical independent variables for year *t2* to your model, you can forecast a land use pattern for a future year *t3*.
 
-This analysis uses the following workflow:
+While we have used logistic regression to model spatial phenomena like flooding before, this workflow is different in that we wrangle raster data in R rather than doing it in ArcGIS. **You ABSOLUTELY do not need to master the code in detail, but rather, you should understand what it does operationally, and think about how you can plug in new data from a different time window, in a different geographic context.**
 
-1. Import land cover rasters into R for year *t* and *t-10*
+Land cover rasters are not available for all years, so the analysis shown here uses an eight year window - 2011 (*t1*) to 2019 (*t2*) to generate forecasts for 2027 (*t3*).
 
-2. Reclassify these rasters into *developed* and *undeveloped*
+**The analytical workflow is as follows:**
 
-3. Use map algebra to identify areas that are developed in *t* that were undeveloped in *t-10* - reclassify these as `1` - our outcome of interest.
+1. **Import land cover rasters for the study area MSA in time periods t1 and t2**.
 
-4. We create a "fishnet" grid for our study area (grid cell polygons), and summarize our raster information into these fishnet cells. Each cell is now a row, with columns
+2. **Resample** the rasters to reduce the resolution to something that is manageable for processing on your computer.
 
-5. We engineer independent variables
+3. **Reclassify** these rasters into *developed* and *undeveloped* land cover categories. Use map algebra to identify areas that were undeveloped in base year *t1* that were developed in *t2* - reclassify these as `1` - our outcome of interest.
 
-# 1.3. Setup
+4. **Create a "fishnet" grid** for our study area (grid cell polygons), and summarize our raster information into these fishnet cells. Each cell is now a row, with columns for our dependent variable `development_change` (conversion to developed) and our independent variables, which we will engineer in subsequent steps.
 
-Below we load the libraries needed for the analysis as well as a `mapTheme` and `plotTheme`. A set of palette colors are also specified.
+5.**Engineer variables** that you hypothesize are **independent predictors of the likelihood a grid cell converts from undeveloped to developed between *t1* and *t2*. **
 
-_MF Note: This chunk differs from the original markdown in a few ways. First, the library `igraph` is now needed. Second, the `mapTheme` and `plotTheme` calls are altered to reflect the default styles we have been using this semester._
+The variables used in this workflow include distance to the nearest highway (using `tigris` data on highways), the *spatial lag of development* e.g. the nearness to the closest developed fishnet cell, and census variables including population density.
+
+Build identical variables for *t1* and *t2* - you will need the *t2* data to make your projections for *t3*.
+
+6. **Conduct exploratory analysis** to see what independent variables might be correlated with `development_change` and to examine the data set for spatial patterns that might provide clues about feature engineering.
+
+7. Split your data into training and testing sets and **train a binomial logistic regression model** using *t1* data that can predict `development_change`.
+
+8. **Validate your model** by examining errors in your test set using a confusion matrix, ROC curve, plots and maps.
+
+9. **Optimize the model for accuracy and generalizability** through feature engineering, feature selection, and changes to your classification threshold.
+
+10. **Output a forecast** of future development using your final model and variables from *t2*
+
+11. **Interpret and analyze your forecast** using your domain expertise in planning. This includes an analysis of projected development on sensitive lands and a detail of forecasts by county. This is a precursor to any planning or policy action regarding infrastructure, zoning, preservation, incentives or other tools.
+
+# 1.3. Alternative Workflow Notes for ArcGIS
+
+This document functions as a template for a class assignment in CPLN 6750 - different student teams might choose to build spatial features with ArcGIS. The workflow would function in the same way as described in the previous section - loading in two time periods of land cover data, reclassifying it, identifying change, and then summarizing to a fishnet. You can calculate distance to highways, spatial lag to nearest developed cell, and other spatial variables in ArcGIS.
+
+However, you will need to bring your data from *t1* and *t2* into R in fishnet form in order to run your logistic regression models. In this case, bring your data into R in step 10 "Creating Our Data Set for Modeling".
+
+# 1.4. Setup - Loading Libraries and Functions
+
+Below we load the libraries needed for the analysis. A set of palette colors are also specified.
+
+The packages are as follows
+
+- tidyverse - The main data wrangling and visualization packages including dplyr and ggplot2
+
+- sf - The core R-based vector GIS package
+
+- raster - A raster GIS package - this package doesn't always use the "tidy" syntax we are used to. `terra` is the main competitor for raster work in R - if you don't like `raster`, try it out.
+
+- kableExtra - a package that makes nice readable tables in R Markdown
+
+- tidycensus - a package for calling census data from the US Census API
+
+- tigris - a library for calling US Census Bureau vector GIS data
+
+- FNN - a spatial point-pattern analysis package that we use for K-nearest neighbor
+
+- caret - a package used for applied predictive modeling
+
+- yardstick - a package for summarizing model performance
+
+- plotROC - a tool to plot ROC curves, a diagnostic for logistic regression
+
+- ggrepel - graphics package to handle labels in ggplot2
+
+- pROC - a package to analyze ROC curves
+
+- grid - graphics package to display multiple plots in one visualization
+
+- gridExtra - a package used to make small multiple arrangements of ggplots
+
+- viridis - A library with nice color ramps for our charts and maps.
+
+- igraph - A package for network analysis
+
+- mapview - A quick web mapping package that can handle sf and raster data
+
+- FedData - A package for accessing federal satellite imagery via API
 
 ```{r load_packages, message=FALSE, warning=FALSE, results = "hide"}
 library(tidyverse)
 library(sf)
 library(raster)
-library(knitr)
 library(kableExtra)
 library(tidycensus)
 library(tigris)
 library(FNN)
-#library(QuantPsyc) # JE Note: in R 4.1, QuantPsyc package not available.
 library(caret)
 library(yardstick)
-library(pscl)
 library(plotROC) 
 library(ggrepel)
 library(pROC)
@@ -111,21 +167,7 @@ library(gridExtra)
 library(viridis)
 library(igraph)
 library(mapview)
-
-plotTheme <- theme(
-  plot.title =element_text(size=12),
-  plot.subtitle = element_text(size=8),
-  plot.caption = element_text(size = 6),
-  axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
-  axis.text.y = element_text(size = 10),
-  axis.title.y = element_text(size = 10),
-  # Set the entire chart region to blank
-  panel.background=element_blank(),
-  plot.background=element_blank(),
-  #panel.border=element_rect(colour="#F0F0F0"),
-  # Format the grid
-  panel.grid.major=element_line(colour="#D0D0D0",size=.75),
-  axis.ticks=element_blank())
+library(FedData)
 
 palette2 <- c("#41b6c4","#253494")
 palette4 <- c("#a1dab4","#41b6c4","#2c7fb8","#253494")
@@ -134,11 +176,19 @@ palette10 <- c("#f7fcf0","#e0f3db","#ccebc5","#a8ddb5","#7bccc4",
                "#4eb3d3","#2b8cbe","#0868ac","#084081","#f7fcf0")
 ```
 
-We also include several helper functions. `quintilesBreaks` takes a dataframe and a column and outputs the quintile breaks, helping shorten the below `ggplot` calls.
+We will also load several functions that are custom built for use in this workflow: 
 
-It takes longer to `ggplot` a polygon fishnet with `geom_sf` than it does to plot `geom_point`. To cut down on plotting time, the `xyC` (for ‘XY Coordinates’) takes a fishnet `sf` and converts it to a dataframe of grid cell centroid coordinates.
+`quintileBreaks` takes a dataframe and a column name and outputs the quintile breaks, helping shorten the below `ggplot` calls.
 
-`rast` is a function allowing us to quickly plot raster values in `ggplot`.
+`xyC` quickly plots sf polygons by converting a fishnet into a dataframe of grid cell centroid coordinates that can be plotted using `geom_point`.
+
+`rast` quickly converts raster objects in R into data frames for quick plotting in `ggplot`
+
+`nn_function` measures the distance from one `sf` point object to its k-nearest-neighbors from another `sf` point object
+
+`aggregateRaster`loops through a list of rasters, converts the each raster to points, filters only points that have value of `1` (ie. is the _ith_ land cover type), and then aggregates to the fishnet.
+
+The following code block loads these functions:
 
 ```{r, warning = FALSE, message = FALSE}
 #this function converts a column in to quintiles. It is used for mapping.
@@ -159,193 +209,31 @@ rast <- function(inRaster) {
   data.frame(
     xyFromCell(inRaster, 1:ncell(inRaster)), 
     value = getValues(inRaster)) }
-```
 
-# 2. Data Wrangling & Feature Engineering
+# knn distance function
 
-_JE Note: Land cover data link has been updated._
+nn_function <- function(measureFrom,measureTo,k) {
+  #convert the sf layers to matrices
+  measureFrom_Matrix <-
+    as.matrix(measureFrom)
+  measureTo_Matrix <-
+    as.matrix(measureTo)
+  nn <-   
+    get.knnx(measureTo, measureFrom, k)$nn.dist
+    output <-
+    as.data.frame(nn) %>%
+    rownames_to_column(var = "thisPoint") %>%
+    gather(points, point_distance, V1:ncol(.)) %>%
+    arrange(as.numeric(thisPoint)) %>%
+    group_by(thisPoint) %>%
+    summarize(pointDistance = mean(point_distance)) %>%
+    arrange(as.numeric(thisPoint)) %>% 
+    dplyr::select(-thisPoint) %>%
+    pull()
+  
+  return(output)  
+}
 
-In this section a considerable amount of vector and raster data is wrangled together into a regression-ready dataset. The following datasets are used:
-
-2.2 - 2.3: Land cover data [downloaded](https://www.mrlc.gov/data/nlcd-land-cover-change-index-conus) from the Multi-Resolution Land Characteristics Consortium’s National Land Cover Database (NLCD) includes annual land cover and land cover change raster data for the entire country. These data are sampled to a 4,000 by 4,000 ft^2 fishnet, which will be used for . 2.4: Population data is downloaded from the U.S. Census and joined to the fishnet by distributing Census Tract population totals proportionally to each grid cell. 2.5: Highway vectors are downloaded from Texas State open data website and used to wrangle highway proximity features. 2.6: The land cover change data is used to engineer spatial lag features. 2.7: County polygons are downloaded using the `tigris` package. 2.8: Each feature is wrangled into a final dataset.
-
-It is important to remember that land cover is not ‘land use’. Typically, the former refers to phenomena on the Earth’s surface including both the built environment and natural resources, while the latter typically refers only to variation in the built environment.
-
-Other raster features are created such as distance to highways, for instance. These rasters are then integrated with a vector fishnet. Additional feature engineering is performed on the vector-side providing a simple, but comprehensive snapshot of the development process in and around Houston between 2001 and 2011.
-
-## 2.2. Land Cover Change Data
-
-The dependent variable we wish to forecast is land cover change between 2001 and 2011. In this section, the land cover raster data is loaded, reclassified and integrated with a vector fishnet. As before, the fishnet will allow us to parameterize spatial relationships in a regression context.
-
-The table below shows descriptions of each categorical land cover type in the land cover data. Below, we will reclassify these data into more useful categories.
-
- _JE Note: Land cover categories can be found [here](https://www.mrlc.gov/data/legends/national-land-cover-database-class-legend-and-description) - will replace with markdown table at a later point._ 
- 
-Several raster layers have been provided for this analysis: 
-
-- We read in `houstonMSA` - this is the extent of the study area 
-
-- `lc_change` is a raster of land cover change - where there were conversions between one land cover and another on the time frame 2000-2010. We plot the raster using `ggplot` and the `rast` function specified above.
-
-MF NOTE - It's better if we sub in the routine from the appendix here so that you can calculate LC Change yourself.
-
-Note that `lc_change` is projected as `NAD 1983 StatePlane Texas South FIPS 4205 Feet`. The original land cover raster is at a 30 meter by 30 meter resolution. The rasters provided are ultimately resampled up to 4000 feet by 4000 feet. The Houston metro area is quite large at roughly 10,000 square meters (`st_area(houstonMSA) * 3.58701e-8`). The original 30 by 30 meter data has nearly 58 million grid cells. A vector fishnet dataset of this size would be too computationally intensive. By resampling we gain some computational efficiency but loose some accuracy. Nevertheless, this approach works well for educational purposes.
-
-```{r load_data, warning = FALSE, message = FALSE, results = "hide"}
-houstonMSA <- 
-  st_read("https://raw.githubusercontent.com/mafichman/CPLN_675/main/Week_14_15/data/UGB_Chapter_data/houston_MSA.geojson") %>%
-  st_transform('ESRI:102741') # JE Note: added 'ESRI:' in front of projection
-
-lc_change = raster("https://github.com/mafichman/CPLN_675/raw/main/Week_14_15/data/UGB_Chapter_data/resam4k.tif")
-```
-
-We now plot the MSA.
-
-MF NOTE - this needs to be simplified or clarified.
-
-```{r plot_msa, warning= FALSE, message= FALSE}
-ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_raster(data=rast(lc_change) %>% na.omit %>% filter(value > 0), 
-              aes(x,y,fill=as.factor(value))) +
-  scale_fill_viridis(direction = -1, discrete=TRUE, name ="Land Cover\nChange") +
-  labs(title = "Land Cover Change, 2000-2010") +
-  theme_void() +
-  theme(legend.direction="horizontal")
-```
-
-Next, we reclassify the raster such that all the developed grid cell values receive a value of 1 and all other values receive a value of 0. This is done using a reclassify matrix. The matrix reads row by row. Row 1 says any grid cell ranging from 0 to 12 takes a value of 0; 13 or greater through 24, a value of 1; and all other values take 0.
-
-```{r, warning = FALSE, message = FALSE}
-reclassMatrix <- 
-  matrix(c(
-    0,12,0,
-    12,24,1,
-    24,Inf,0),
-  ncol=3, byrow=T)
-
-reclassMatrix
-```
-
-Now `reclassify` and convert all 0’s to `NA`. We apply a name to the raster with `names`. This is done to make it faster to join raster to the fishnet below. You can see the frequency table of values with `freq(lc_change2)`. There are 655 areas that changed from underdeveloped to developed in the data.
-
-```{r, warning = FALSE, message = FALSE}
-lc_change2 <- 
-  reclassify(lc_change,reclassMatrix)
-
-lc_change2[lc_change2 < 1] <- NA
-
-names(lc_change2) <- "lc_change"
-
-ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_raster(data=rast(lc_change2) %>% na.omit, 
-              aes(x,y,fill=as.factor(value))) +
-  scale_fill_viridis(discrete=TRUE, name ="Land Cover\nChange") + 
-  labs(title="Development Land Use Change") +
-  theme_void()
-```
-
-Next, the fishnet is created at 4000 by 4000 foot resolution and subset it to the Houston MSA with `st_intersection`. 
-
-```{r, warning = FALSE, message = FALSE}
-houstonMSA_fishnet <- 
-  st_make_grid(houstonMSA, 4000) %>%
-  st_sf()
-
-houstonMSA_fishnet <-
-  houstonMSA_fishnet[houstonMSA,]
-```
-
-The vector fishnet is then plotted. Note that this plot takes a bit of time to render because there are more than 18,000 polygons.
-
-```{r, warning = FALSE, message= FALSE}
-ggplot() +
-  geom_sf(data=houstonMSA_fishnet) +
-  labs(title="Fishnet, 4000 Foot Resolution") +
-  theme_void()
-```
-
-Then the raster is converted to points, which makes its joining to the vector fishnet a bit faster. Now to extract the raster values into the fishnet. There is a function in the `raster` package called `RasterToPolygon` but it is quite slow.
-
-Below, a slightly faster approach is develop that converts the raster to an `sf` point layer and then joins the points to the fishnet with `aggregate`. This works well because the raster and the fishnet are of the same spatial resolution. Finally, the fishnet variable `lc_change` is created that is `1` where new development has occurred and `0` where it has not. This is our dependent variable and encoded as a factor.
-
-To speed up the mapping process, fishnet polygons are converted to centroid points using the `xyC` function defined 
-
-_MF Note: The function `aggregate` is an alternative way to do a spatial join - similar to `st_intersection` or other `sf` package features._
-
-```{r, warning = FALSE, message = FALSE}
-changePoints <-
-  rasterToPoints(lc_change2) %>%
-  as.data.frame() %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(houstonMSA_fishnet))
-
-fishnet <- 
-  aggregate(changePoints, houstonMSA_fishnet, sum) %>%
-  mutate(lc_change = ifelse(is.na(lc_change),0,1),
-         lc_change = as.factor(lc_change))
-
-ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_point(data=fishnet, 
-             aes(x=xyC(fishnet)$x, y=xyC(fishnet)$y, colour=lc_change)) +
-  scale_colour_manual(values = palette2,
-                      labels=c("No Change","New Development"),
-                      name = "") +
-  labs(title = "Land Cover Development Change", subtitle = "As fishnet centroids") +
-  theme_void()
-```
-
-
-## 2.3. Land Cover in 2001
-
-It is reasonable to hypothesize that the propensity of new development is a function of existing land cover categories. In this section we identify these other land cover categories from 2001 and integrate each with the fishnet.
-
-```{r, warning = FALSE, message = FALSE}
-lc_2001 <- raster("https://github.com/mafichman/CPLN_675/raw/main/Week_14_15/data/UGB_Chapter_data/lc_2001_4k.tif")
-
-ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_raster(data=rast(lc_2001) %>% na.omit %>% filter(value > 0), 
-              aes(x,y,fill=as.factor(value))) +
-  scale_fill_viridis(discrete=TRUE, name ="") +
-  labs(title = "Land Cover, 2001") +
-  theme_void() +
-  theme(legend.direction="horizontal")
-```
-
-The table below shows the approach taken to recoded existing land cover codes into the categories used in our analysis. In the code block below new rasters are generated and `names` are applied. Naming ensures that when the raster is integrated with the fishnet, the column reflects the appropriate raster.
-
-| Old_Classification             | New_Classification                                  |
-|--------------------------------|-----------------------------------------------------|
-| Open Space as well as Low, Medium and High Intensity Development | Developed |
-| Deciduous, Evergreen, and Mixed Forest |  Forest |
-| Pasture/Hay and Cultivated Crops | Farm |
-| Woody and Emergent Herbaceous Wetlands | Woodlands |
-| Barren Land, Dwarf Scrub, and Grassland/Herbaceous | Other Undeveloped |
-| Water | Water |
-
-```{r, warning = FALSE, message = FALSE}
-developed <- lc_2001 == 21 | lc_2001 == 22 | lc_2001 == 23 | lc_2001 == 24
-forest <- lc_2001 == 41 | lc_2001 == 42 | lc_2001 == 43 
-farm <- lc_2001 == 81 | lc_2001 == 82 
-wetlands <- lc_2001 == 90 | lc_2001 == 95 
-otherUndeveloped <- lc_2001 == 52 | lc_2001 == 71 | lc_2001 == 31 
-water <- lc_2001 == 11
-
-names(developed) <- "developed"
-names(forest) <- "forest"
-names(farm) <- "farm"
-names(wetlands) <- "wetlands"
-names(otherUndeveloped) <- "otherUndeveloped"
-names(water) <- "water"
-```
-
-Next, each raster is aggregated to the fishnet by way of a function called `aggregateRaster`. Here, the process used above to To do this, a function is created below that loops through a list of rasters, converts the _ith_ raster to points, filters only points that have value of `1` (ie. is the _ith_ land cover type), and then aggregates to the fishnet.
-
-Here is the function.
-
-```{r, warning = FALSE, message = FALSE}
 aggregateRaster <- function(inputRasterList, theFishnet) {
   #create an empty fishnet with the same dimensions as the input fishnet
   theseFishnets <- theFishnet %>% dplyr::select()
@@ -371,971 +259,100 @@ aggregateRaster <- function(inputRasterList, theFishnet) {
   }
 ```
 
-The `theRasterList` of land cover types in 2001 is created and then fed into `aggregateRaster`. The result is converted to long form grid cell centroids and plot as small multiple maps.
+## 1.5. A Note About Census Data
 
-Note the inclusion of `st_cast` here which convert all geometries to `POLYGON`. If you create a frequency table of geometry types in `aggregatedRasters`, you will notice some and handful of `MULTIPOLYGONS`. Try `table(st_geometry_type(aggregatedRasters)`). These rogue multipolygons break the `xyC` function which is designed to find grid cell centroids. After all, there is no one centroid of several combined polygons. Thus `st_cast` ensures all geometries are just `POLYGON`. Look out for this function throughout the remainder of this chapter.
+As of this writing, in April of 2025, there has been recent inconsistent service with the US Census API's tigerline geometries. This has affected the `tidycensus` and `tigris` packages. If you experience issues using tidycensus or tigris, refer to the "issues" section of the respective packages github pages to see if your error is being discussed and troublehot.
 
-MF NOTE - simplify this and split it into smaller pieces
+If you get the following error, this means the API is down:
 
-```{r, warning = FALSE, message = FALSE}
-theRasterList <- c(developed,forest,farm,wetlands,otherUndeveloped,water)
+`The source could be corrupt or not supported. See `st_drivers()` for a list of supported formats.`
 
-aggregatedRasters <-
-  aggregateRaster(theRasterList, houstonMSA_fishnet) %>%
-  dplyr::select(developed,forest,farm,wetlands,otherUndeveloped,water) %>%
-  mutate_if(is.numeric,as.factor)
+The way to solve this is to uninstall tidycensus and tigris, and install a "patched" version of `tigris` direct from developer Kyle Walker's github repo using the `devtools` package. Then you reinstall tigris first, and tidycensus second. The patched version of tigris will get the data from the Census FTP server instead of the API. [There is a quick code vignette I've created to walk you through this](https://github.com/mafichman/CPLN_675/blob/main/misc/tigris_patch.R).
 
-```
+# 2. Loading LC and MSA data
 
+## 2.1. Load the study area MSA
 
-We can now plot the aggregated rasters in a facetted fashion and examine them.
+Our study area is the Houston MSA. We can `st_read` a spatial data object directly from Github, where we have our class data hosted.
+
+We `st_transform` it to the 2278 coordinate reference system, which is appropriate for Houston and has a linear unit in feet.
+
+For your assignment, you will want to load in data using `tigris` or `tidycensus` for your study area of choice in this step. You might do this by loading the counties that comprise your area, and using `st_union` to turn them all into one shape.
 
 ```{r}
-aggregatedRasters %>%
-  gather(var,value,developed:water) %>%
-  st_cast("POLYGON") %>%    #just to make sure no weird geometries slipped in
-  mutate(X = xyC(.)$x,
-         Y = xyC(.)$y) %>%
-  ggplot() +
-    geom_sf(data=houstonMSA) +
-    geom_point(aes(X,Y, colour=as.factor(value))) +
-    facet_wrap(~var) +
-    scale_colour_manual(values = palette2,
-                        labels=c("Other","Land Cover"),
-                        name = "") +
-    labs(title = "Land Cover Types, 2001",
-         subtitle = "As fishnet centroids") +
-   theme_void()
+houstonMSA <- 
+  st_read("https://raw.githubusercontent.com/mafichman/CPLN_675/main/Week_14_15/data/UGB_Chapter_data/houston_MSA.geojson") %>%
+  st_transform(2278)
 ```
+## 2.2. Load Land Cover for t1 and t2
 
-We can also look at the rasters in a dynamic map using mapview. This might be helpful if you are exploring your data.
+We can use a direct API call to import raster data of interest directly into R.
 
-You can manipulate the `zcol` argument below and switch the land cover type you see in the map.
+The `get_nlcd` function from the package `FedData` can be used to fetch National Land Cover Database rasters from [www.mrlc.gov](www.mrlc.gov) and then crop it to a `template` that is a `sf` shape that you specify as the boundary for your call. For our template, we will use the `houstonMSA`.
+
+There aren't NLDD available for every year, so we will use 2011 and 2019 data as our *t1* and *t2*, respectively. 
+
+This code block uses the `raster` function creates a data object of `Formal class RasterLayer`
 
 ```{r}
 
-mapview(aggregatedRasters, zcol = "developed")
+lc_2011 <- get_nlcd(
+    template = houstonMSA,
+    label = "lc_2011",
+    year = 2011
+  ) %>%
+  raster(.)
 
 ```
 
-## 2.4. Census Data
 
-Population and population change is obviously an critical demand-side component of predicting `Development_Demand`. Census data for both 2000 and 2010 can be downloaded quickly using the `tidycensus` package. As illustrated below, these data are downloaded at a census tract geography and thus, an approach is needed to reconcile tracts and fishnet geometries. This is accomplished using a technique called areal weighted interpolation.
 
-Recall, you will need a census API key to download the census data which must be input with `census_api_key`. 
+```{r}
 
-```{r load_key_hide, warning= FALSE, include=FALSE}
-census_key <- read.table("~/GitHub/census_key.txt", quote="\"", comment.char="")
-census_api_key(census_key[1] %>% as.character(), overwrite = TRUE)
+lc_2019 <- get_nlcd(
+    template = houstonMSA,
+    label = "lc_2019",
+    year = 2019
+  ) %>%
+  raster(.)
+
 ```
 
-```{r load_key, warning = FALSE, eval = FALSE}
-census_api_key("YOUR KEY GOES HERE", overwrite = TRUE)
+Let's look at some info about these rasters. By typing the name of our data object(s) into the console, we can see what the classes are, their ID numbers, and the fact that they are 30m grid cells.
+
+Recall that the NLCD has numerical classifications for land cover types.
+
+```{r}
+lc_2019
 ```
 
-First data is pulled for 2000 and reprojected.
+# 3. Detecting Land Cover Conversion
 
-_MF Note: In your assignment, you will be using a different timeframe, and therefore you will use ACS data rather than decennial census data. Look at the materials from week 5 (Intro to SF and Tidyverse) and the Intro to R for Planners text to see how `get_acs` can be used to replace `get_decennial` in your workflow._
+We have rasters representing land cover in `t1` and `t2` - we want to detect areas where land converted from undeveloped to developed - those cells represent the "1" in the logit model we will develop, and we want to train a model to estimate the likelihood any given cell will be a "1".
 
-```{r, warning = FALSE, message = FALSE, results = "hide"}
-houstonPop00 <- 
-  get_decennial(geography = "tract", variables = "P001001", year = 2000,
-                state = 48, geometry = TRUE, 
-                county=c("Harris COunty","San Jacinto","Montgomery","Liberty","Waller",
-                         "Austin","Chambers","Fort Bend","Brazoria","Galveston")) %>%
-  rename(pop_2000 = value) %>%
-  st_transform(st_crs(houstonMSA_fishnet))
+
+## 3.1. Resampling Rasters
+
+We want to resample our rasters to make the resolution much coarser (e.g make the cells much larger). At 30m, trust me, they will crush our laptops when we try to process stuff.
+
+Let's resample them to be 30x coarser resolution. You will make your own resampling deliberation when you do this analysis yourself for your homework. The resolution depends a lot on your study area size, but standard laptop computers are probably best suited to handle thousands or low-tens-of-thousands cells as we build our fishnets and start mapping and modeling.
+
+The `aggregate` function from the `raster` package is used for resampling. We create two new `RasterLayer` data sets with the appendage `_rs` in their name to denote that they are resampled.
+
+Specifying `fun = "modal"` is most appropriate for categorical data like land cover, extracting the modal value of the cells that are being aggregated together. (You can use means, maxima, and other stats for this argument too).
+
+```{r}
+lc_2011_rs <- aggregate(lc_2011, fact = 30, fun = "modal")
+
+lc_2019_rs <- aggregate(lc_2019, fact = 30, fun = "modal")
+
 ```
 
-Now data for 2010 is downloaded. In this instance, `st_buffer` is used to buffer the the tracts by -1ft. This is done because `tidycensus` appears to return geometries that are problematic when subjected to the area weighted interpolation function below. As done in previous chapters, a very small buffer is used to correct the geometries.
+## 3.2. Reclassifying As Developed and Undeveloped
 
-```{r, warning = FALSE, message = FALSE, results = "hide"}
-houstonPop10 <- 
-  get_decennial(geography = "tract", variables = "P001001", year = 2010,
-                state = 48, geometry = TRUE,
-                county=c("Harris COunty","San Jacinto","Montgomery","Liberty","Waller",
-                         "Austin","Chambers","Fort Bend","Brazoria","Galveston")) %>%
-  rename(pop_2010 = value) %>%
-  st_transform(st_crs(houstonMSA_fishnet)) %>%
-  st_buffer(-1)
-```
+In order to figure out which cells are developed or undeveloped, and subsequently identify the ones that were developed between *t1* and *t2*, we need to reclassify our land cover data to consist of 1 and 0 observations (e.g. 1 is the developed classes 13-24, 0 is everything else). Check section 2.2 if you want to see which codes correspond to which numbers in the NLCD.
 
-Both years of census data are then plotted.
-
-<div class="superbigimage">
-```{r, warning = FALSE, message = FALSE, fig.height= 8, fig.width= 11}
-grid.arrange(
-ggplot() +
-  geom_sf(data = houstonPop00, aes(fill=factor(ntile(pop_2000,5))), colour=NA) +
-  scale_fill_manual(values = palette5,
-                    labels=quintileBreaks(houstonPop00,"pop_2000"),
-                   name="Quintile\nBreaks") +
-  labs(title="Population, Houston MSA: 2000") +
-  theme_void(),
-
-ggplot() +
-  geom_sf(data = houstonPop10, aes(fill=factor(ntile(pop_2010,5))), colour=NA) +
-  scale_fill_manual(values = palette5,
-                    labels=quintileBreaks(houstonPop10,"pop_2010"),
-                   name="Quintile\nBreaks") +
-  labs(title="Population, Houston MSA: 2010") +
-  theme_void(), ncol=2)
-```
-</div>
-
-Now to reconcile tract boundaries and fishnet grid cells. I’d like you to pay particular attention to this process.
-
-A spatial join would be inappropriate as it would assign the same population value from one tract to the many intersecting grid cells. Instead, the area weighted interpolation function, `st_interpolate_aw`, assigns a proportion of a tract’s population to a grid cell weighted by the proportion of the tract that intersects the grid cell. This works best of course, when we assume that the tract population is uniformly distributed across the tract. This is typically not a great assumption. However, it is a reasonable here particularly given population is a feature in a regression and not an outcome that needs to be measured with significant precision.
-
-The Census data `houstonPop`, has a different spatial extent than `houstonMSA_fishnet`. Most notably, there are no vectors where water is present. To maintain the needed 18,025 grid cells units `(nrow(houstonMSA_fishnet))`, a a unique id is created, `fishnetID`. Then the area weighted interpolation is performed on `population` for the 2000 and 2010 layers. Finally, the results are joined back (`left_join`) to `houstonMSA_fishnet`. This approach maintains a consistent spatial extent.
-
-It would be helpful for you to spend some time running through each code block line by line. Areal weighted interpolation is a really strong spatial analysis skill to have. You can do this in ArcGIS but there is not automated approach.
-
-_MF Note: This code chunk has notable differences from the original markdown. Most notably - the `rownames_to_column` function has been inserted into the dplyr chain as a way to assign out the fishnet cell ID from the houstonMSA_fishnet to the interpolated data. This allows it to be joined to the fishnet by it's unique ID. The `st_interpolate_aw` function removes the unique ID._
-
-```{r, warning = FALSE, message = FALSE}
-houstonMSA_fishnet <-
-  houstonMSA_fishnet %>%
-  rownames_to_column("fishnetID") %>% 
-  mutate(fishnetID = as.numeric(fishnetID)) %>%
-  dplyr::select(fishnetID)
-
-fishnetPopulation00 <-
-  st_interpolate_aw(houstonPop00["pop_2000"], houstonMSA_fishnet, extensive=TRUE) %>%
-  as.data.frame(.) %>%
-  rownames_to_column(var = "fishnetID") %>%
-  left_join(houstonMSA_fishnet %>%
-              mutate(fishnetID = as.character(fishnetID)),
-            ., by=c("fishnetID"='fishnetID')) %>% 
-  mutate(pop_2000 = replace_na(pop_2000,0)) %>%
-  dplyr::select(pop_2000)
-
-fishnetPopulation10 <-
-  st_interpolate_aw(houstonPop10["pop_2010"],houstonMSA_fishnet, extensive=TRUE) %>%
-  as.data.frame(.) %>%
-  rownames_to_column(var = "fishnetID") %>%
-  left_join(houstonMSA_fishnet %>%
-              mutate(fishnetID = as.character(fishnetID)),
-            ., by=c("fishnetID"='fishnetID')) %>% 
-  mutate(pop_2010 = replace_na(pop_2010,0)) %>%
-  dplyr::select(pop_2010)
-
-fishnetPopulation <- 
-  cbind(fishnetPopulation00,fishnetPopulation10) %>%
-  dplyr::select(pop_2000,pop_2010) %>%
-  mutate(pop_Change = pop_2010 - pop_2000)
-```
-
-For comparison purposes, both the 2010 census tract geometries and the population weighted grid cells are plotted.
-
-<div class="superbigimage">
-```{r, warning = FALSE, message = FALSE, fig.height = 8, fig.width= 11}
-grid.arrange(
-ggplot() +
-  geom_sf(data=houstonPop10, aes(fill=factor(ntile(pop_2010,5))),colour=NA) +
-  scale_fill_manual(values = palette5,
-                    labels=substr(quintileBreaks(houstonPop10,"pop_2010"),1,4),
-                   name="Quintile\nBreaks") +
-  labs(title="Population, Houston MSA: 2010",
-       subtitle="Represented as tracts; Boundaries omitted") +
-  theme_void(),
-
-ggplot() +
-  geom_sf(data=fishnetPopulation, aes(fill=factor(ntile(pop_2010,5))),colour=NA) +
-  scale_fill_manual(values = palette5,
-                   labels=substr(quintileBreaks(fishnetPopulation,"pop_2010"),1,4),
-                   name="Quintile\nBreaks") +
-  labs(title="Population, Houston MSA: 2010",
-       subtitle="Represented as fishnet gridcells; Boundaries omitted") +
-  theme_void(), ncol=2)
-```
-</div>
-
-## 2.5. Highway Distance
-
-Accessibility is a key determinant of development potential particularly in a sprawling city like Houston. Accessibility features are engineered by measuring distance from each grid cell to its nearest highway.
-
-First highway vectors are downloaded from the Texas State open data website in `geojson` format; projected and subset to the subset using `st_intersection`. Below, new development is mapped with the highway overlay.
-
-_MF Note: A notable change from the original markdown - these data have been hard-coded to a file endpoint. The original data referenced in the code can be found [here](https://opendata.arcgis.com/datasets/8b2f979d4ef24388a6a893019322e71c_0.geojson)_
-
-```{r, warning = FALSE, message = FALSE, results = "hide"}
-houstonHighways <-
-  st_read("https://github.com/mafichman/CPLN_675/raw/main/Week_14_15/data/UGB_Chapter_data/houstonHighways.geojson") %>%
-  st_transform(st_crs(houstonMSA)) %>%
-  st_intersection(houstonMSA)
-```
-
-```{r plot_highway, warning = FALSE, message= FALSE}
-ggplot() +
-  geom_point(data=fishnet, 
-             aes(x=xyC(fishnet)[,1], y=xyC(fishnet)[,2],colour=lc_change),size=1.5) +
-  geom_sf(data=houstonHighways) +
-  scale_colour_manual(values = palette2,
-                      labels=c("No Change","New Development")) +
-  labs(title = "New Development and Highways",
-       subtitle = "As fishnet centroids") +
-  theme_void()
-```
-
-Below are some great r-based raster skills. The distance from each grid cell to its nearest highway segment is measured.
-
-First, the highway layer is converted to raster. This is done by creating an `emptyRaster` of `NA` grid cells at the same spatial extent as `lc_change`. Then, `highway_raster` is created by converting `houstonHighways` to `sp` form and then to applying `rasterize`. The raster is then converted to points with `rasterToPoints` and `st_as_sf`, then `aggregate` is used to calculate mean distance by grid cell.
-
-You may (but likely not) be interested in learning that `sp` is the older spatial data convention in R. Although `sf` is the new convention, raster/vector interactions still require `sp`. The `as` function converts.
-
-```{r, warning = FALSE, message = FALSE}
-emptyRaster <- lc_change
-emptyRaster[] <- NA
-
-highway_raster <- 
-  as(houstonHighways,'Spatial') %>%
-  rasterize(.,emptyRaster)
-
-highway_raster_distance <- distance(highway_raster)
-names(highway_raster_distance) <- "distance_highways"
-
-highwayPoints <-
-  rasterToPoints(highway_raster_distance) %>%
-  as.data.frame() %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(houstonMSA_fishnet))
-
-highwayPoints_fishnet <- 
-  aggregate(highwayPoints, houstonMSA_fishnet, mean) %>%
-  mutate(distance_highways = ifelse(is.na(distance_highways),0,distance_highways))
-
-ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_point(data=highwayPoints_fishnet, aes(x=xyC(highwayPoints_fishnet)[,1], 
-                                             y=xyC(highwayPoints_fishnet)[,2], 
-                 colour=factor(ntile(distance_highways,5))),size=1.5) +
-  scale_colour_manual(values = palette5,
-                      labels=substr(quintileBreaks(highwayPoints_fishnet,"distance_highways"),1,8),
-                      name="Quintile\nBreaks") +
-  geom_sf(data=houstonHighways, colour = "red") +
-  labs(title = "Distance to Highways",
-       subtitle = "As fishnet centroids; Highways visualized in red") +
-  theme_void()
-```
-
-## 2.6. The Spatial Lag of Development
-
-At the center of our model is a hypothesis that development demand must in part, be a function of the pattern of existing development. Development occurs where the market believes a higher and better use may bring an investment return. In the case of sprawling region like Houston, assuming the requisite demand, there is a clear return on investment for converting farmland to suburban housing.
-
-The traditional ‘bid-rent’ economic model of development posits that development demand is a function of accessibility. This model works well in cities where centralized locations offer the most accessibility. However, it assumes that all consumers of land share the same preferences for central city access. While urban land is valuable, contemporary urbanism in regions like Houston show us that suburban locations can be quite desirable as well.
-
-Why is that? Hinterland locations do not offer direct access to jobs and cultural amenities. Instead, residents trade-off accessibility for larger lots and bigger homes; as well as a bundle of public services like school quality. Developers are attracted to suburban and exurban locations because of cheap land on ‘greenfield’ sites like farms and open space.
-
-The demand for greenfield development can vary substantially depending on the existing spatial configuration of development. If accessibility to central locations was the only underlying consideration, developers would sprawl directly out to the periphery, much like the dynamic we modeled in the Urban Growth Boundary chapter (Chapter 2). As a space/time process, this would look much like spilled milk, emanating from a central point outward across the kitchen table.
-
-Another option for developers is to move beyond the periphery onto greenfield sites that are cheaper because they are even less accessible. In this case, the space/time process looks small ‘patches’ of new development dotting the landscape and “leapfrogging” from one greenfield to the next. The economic incentive is to always develop beyond the periphery, where land is cheapest. There are some real costs to this model however. For one, when development is so diffuse, it is more burdensome to efficiently deploy infrastructure like roads, sewers and electicity. Second, leapfrog development fragmentats natural areas reducing biodiversity and stressing the natural habitat of species that need continuous open space to thrive.
-
-In Houston, as in many sprawling regions of the U.S. the economic incentives that underlie sprawl likely encourage both the accessibility and leapfrog models of development. For our purposes however, features must be created to associate these patterns with development. Without them, the model may lack the appropriate spatial experience on which to forecast growth.
-
-To keep it simple, we develop features associated with accessibility-based patterns. In reality, the analyst should develop a series of applicable features and test which best associate with the outcome of interest. The problem becomes infinitely more difficult when one realizes that sprawl patterns may differ throughout the study area - if for instance, land use restrictions varied by county. Below we estimate models using logistic regression, but higher level machine learning algorithms, most notably, Random Forest, are more adept at dealing with non-linearities across space.
-
-Accessibility is measured by way of a spatial lag hypothesizing that new development is a function of distance to existing development. The shorter the distance, the more accessible a grid cell is to existing development. This is measured by calculating the average distance from each grid cell to its 2 nearest developed neighboring grid cells in 2001 using the `nn_function`. The function below calculates average nearest neighbor distance between k point layers. The first parameter specifies coordinates that we want to `measureFrom`, in this case, `fishnet` centroids. The second, indicates the point layer we wish to `measureTo`, in this case, the fishnet centroids that were developed in 2001.
-
-```{r, warning = FALSE, message = FALSE}
-nn_function <- function(measureFrom,measureTo,k) {
-  #convert the sf layers to matrices
-  measureFrom_Matrix <-
-    as.matrix(measureFrom)
-  measureTo_Matrix <-
-    as.matrix(measureTo)
-  nn <-   
-    get.knnx(measureTo, measureFrom, k)$nn.dist
-    output <-
-    as.data.frame(nn) %>%
-    rownames_to_column(var = "thisPoint") %>%
-    gather(points, point_distance, V1:ncol(.)) %>%
-    arrange(as.numeric(thisPoint)) %>%
-    group_by(thisPoint) %>%
-    summarize(pointDistance = mean(point_distance)) %>%
-    arrange(as.numeric(thisPoint)) %>% 
-    dplyr::select(-thisPoint) %>%
-    pull()
-  
-  return(output)  
-}
-```
-
-Why `k=2`? As `k` fluctuates, so does the hypothesized scale of accessibility. One can test the effect of different k parameters on model goodness of fit, but as mentioned, a more sophisticated model would hypothesize that this scale can vary significantly from city to suburb to rural town.
-
-Next, the function appending the lag distance to `fishnet`. There are 3 inputs. The `fishnet` which is converted to a coordinate data frame with the `xyC` function. 2001 developed areas are created using `filter`. The map below illustrates relative accessibility from every grid cell to nearby development.
-
-```{r, warning = FALSE, message = FALSE}
-fishnet$lagDevelopment <-
-    nn_function(xyC(fishnet),
-                xyC(filter(aggregatedRasters,developed==1)),
-                2)
-
-ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_point(data=fishnet, 
-             aes(x=xyC(fishnet)[,1], y=xyC(fishnet)[,2], 
-                 colour=factor(ntile(lagDevelopment,5))), size=1.5) +
-  scale_colour_manual(values = palette5,
-                     labels=substr(quintileBreaks(fishnet,"lagDevelopment"),1,7),
-                     name="Quintile\nBreaks") +
-  labs(title = "Spatial Lag to 2001 Development",
-       subtitle = "As fishnet centroids") +
-  theme_void()
-```
-
-## 2.7. MSA Counties
-
-The `tigris` package allows Texas county geometries to be downloaded. A spatial subset returns only the counties in the MSA. Note that the subset includes a negative 1000ft `st_buffer`. This is done because the spatial extent of `houstonMSA` intersects county boundaries that are actually outside of our study area. Buffering `houstonMSA` slightly limits the intersection range to only those counties in the study area.
-
-Once `studyAreaCounties` is created, it is `st_join`ed with `dat` such that each grid cells knows which county it’s in.
-
-```{r, warning = FALSE, message = FALSE, results = "hide"}
-options(tigris_class = "sf")
-
-studyAreaCounties <- 
-  counties("Texas") %>%
-  st_transform(st_crs(houstonMSA)) %>%
-  dplyr::select(NAME) %>%
-  .[st_buffer(houstonMSA,-1000), , op=st_intersects]
-```
-
-```{r, warning = FALSE, message = FALSE}
-ggplot() +
-  geom_sf(data=studyAreaCounties) +
-  labs(title = "Study Area Counties") +
-  theme_void()
-```
-
-## 2.8. Create the Final Dataset
-
-The last step is to bring together all the disparate feature layers into a final dataset that can be used for analysis. The various fishnet layers are `cbind` together, needed features are extracted and the final fishnet, `dat` is then joined with `studyAreaCounties` to assign each grid cell to a county. `developed10` is created to designate those areas that have already been developed through 2010. Finally, any grid cell that has a `water` land cover designation is removed.
-
-```{r, warning = FALSE, message = FALSE}
-dat <- 
-  cbind(
-    fishnet, highwayPoints_fishnet, fishnetPopulation, aggregatedRasters) %>%
-  dplyr::select(lc_change, developed, forest, farm, wetlands, otherUndeveloped, water,
-                pop_2000, pop_2010, pop_Change, distance_highways,lagDevelopment) %>%
-  st_join(studyAreaCounties) %>%
-  mutate(developed10 = ifelse(lc_change == 1 & developed == 1, 0, developed)) %>%
-  filter(water == 0) 
-```
-
-# 3. Exploratory Analysis
-
-In this section we explore the extent to which each features is associated with development change. If the goal was to predict a continuous variable, scatterplots and correlation coefficients make this process straightforward and relatively easy to explain to a non-technical decison maker.
-
-In this case however, the dependent variable is a binary outcome - either a grid cell was developed between 2001 and 2011 or it wasn’t. In this case, the relevant question is whether for a given feature, there is a statistically significant difference between areas that changed and areas that did not. These differences are explored in a set of plots below. For models with lots of features, these plots could be compliment by a series of difference in means statistical tests.
-
-The below code block `select`s the highways and spatial lag features, converts each to long form and plots each as bar plots. Note that `geom_bar` calculates the `mean`. How do you interpret each of these plots?
-
-```{r, warning = FALSE, message = FALSE}
-dat %>%
-  dplyr::select(distance_highways,lagDevelopment,lc_change) %>%
-  gather(Variable, Value, -lc_change, -geometry) %>%
-  ggplot(., aes(lc_change, Value, fill=lc_change)) + 
-    geom_bar(position = "dodge", stat = "summary", fun.y = "mean") +
-    facet_wrap(~Variable) +
-    scale_fill_manual(values = palette2,
-                      labels=c("No Change","New Development"),
-                      name="") +
-    labs(title="New Development as a Function of the Continuous Variables") +
-    plotTheme 
-```
-
-Next, the same visualization is created for the population related variables. How does this plot inform which features should be included in the model?
-
-```{r, warning = FALSE, message = FALSE}
-dat %>%
-  dplyr::select(pop_2000,pop_2010,pop_Change,lc_change) %>%
-  gather(Variable, Value, -lc_change, -geometry) %>%
-  ggplot(., aes(lc_change, Value, fill=lc_change)) + 
-    geom_bar(position = "dodge", stat = "summary", fun.y = "mean") +
-    facet_wrap(~Variable) +
-    scale_fill_manual(values = palette2,
-                      labels=c("No Change","New Development"),
-                      name="") +
-    labs(title="New Development as a Function of Factor Variables") +
-    plotTheme
-```
-
-Next, a table of land cover conversion between 2001 and 2011 is created. The table suggests for instance, that 1% of farmland regionally was converted to development between 2001 and 2010. This indicator should be interpreted in the context of the scale changes we imposed on the data by moving from a 30ft by 30ft raster to a 4000ft by 4000ft fishnet. This is the same reason why the table suggests `developed` area was then “developed”.
-
-```{r, warning = FALSE, message = FALSE}
-dat %>%
-  dplyr::select(lc_change:otherUndeveloped,developed) %>%
-  gather(Land_Cover_Type, Value, -lc_change, -geometry) %>%
-   st_set_geometry(NULL) %>%
-     group_by(lc_change, Land_Cover_Type) %>%
-     summarize(n = sum(as.numeric(Value))) %>%
-     ungroup() %>%
-    mutate(Conversion_Rate = paste0(round(100 * n/sum(n), 2), "%")) %>%
-    filter(lc_change == 1) %>%
-  dplyr::select(Land_Cover_Type,Conversion_Rate) %>%
-  kable() %>% kable_styling(full_width = F)
-```
-
-# 4. Predicting for 2010
-
-In this section, six separate logistic regression models are estimated to predict development change between 2001 and 2011 - with each subsequent model more sophisticated then the last. To do so, the data is split into 50% training/test sets. Models are estimated on the training set.
-
-Normally, as in previous chapters, a results table row would be generated for each model describing the accuracy and generalizability of predictions for each specification. For brevity, a less sophisticated approach is taken here, judging each by the McFadden or “Psuedo” R Squared statistic on the test set. The model with the greatest goodness of fit is then used for the purposes of prediction.
-
-## 4.2. Modeling
-
-First, `dat` is split into training and test sets. Note how imbalanced the panel is with `table(datTrain$lc_change1)`.
-
-```{r, warning = FALSE, message = FALSE}
-set.seed(3456)
-trainIndex <- 
-  createDataPartition(dat$developed, p = .50,
-                                  list = FALSE,
-                                  times = 1)
-datTrain <- dat[ trainIndex,]
-datTest  <- dat[-trainIndex,]
-
-nrow(dat)
-```
-
-Next six separate `glm` models are estimated adding new variables for each. Figure 4.1 shows the Psuedo R-Squared associated with each model.
-
-`Model1` includes only the 2001 land cover types. `Model2` adds the `lagDevelopment`. Models 3, 4 and 5 attempt three different approaches for modeling population change. `Model3` uses population in 2000; `Model4` uses 2000 and 2010 population; and `Model5` uses population change. All are significant so which population feature should be chosen? The answer lies in how the model will be used to forecast. By modeling population change between 2000 and 2010, the model is well specified to forecast 2020 development by having `pop_Change` indicate change between 2010 and 2020. `Model6` includes distance to the highways, and is the final model employed for prediction.
-
-```{r, warning = FALSE, message = FALSE}
-Model1 <- glm(lc_change ~ wetlands + forest  + farm + otherUndeveloped, 
-              family="binomial"(link="logit"), data = datTrain)
-
-Model2 <- glm(lc_change ~ wetlands + forest  + farm + otherUndeveloped + lagDevelopment, 
-              family="binomial"(link="logit"), data = datTrain)
-              
-Model3 <- glm(lc_change ~ wetlands + forest  + farm + otherUndeveloped + lagDevelopment + pop_2000, 
-              family="binomial"(link="logit"), data = datTrain)          
-              
-Model4 <- glm(lc_change ~ wetlands + forest  + farm + otherUndeveloped + lagDevelopment + pop_2000 + 
-              pop_2010, 
-              family="binomial"(link="logit"), data = datTrain)              
-            
-Model5 <- glm(lc_change ~ wetlands + forest  + farm + otherUndeveloped + lagDevelopment + pop_Change, 
-              family="binomial"(link="logit"), data = datTrain)              
-              
-Model6 <- glm(lc_change ~ wetlands + forest  + farm + otherUndeveloped + lagDevelopment + pop_Change + 
-              distance_highways, 
-              family="binomial"(link="logit"), data = datTrain) 
-```
-
-MF NOTE - Get rid of this. Just let the students check each model instead of making a complex function to make this graphic.
-
-
-Next, a data frame is created that includes columns for the observed development change, `lc_change`, and one that includes predicted probabilities for `Model6`. This data frame is then used as an input to a density plot visualizing the distribution of predicted probabilities by observed class. Only a small number of predicted probabilities are greater than or equal to 50% `(nrow(filter(testSetProbs, probs >= .50)) / nrow(datTest))`. This makes good sense, given how rare of an event development is in our dataset. Ultimately, in order to judge our model with a confusion matrix, a smaller development classification threshold must be employed.
-
-```{r, warning = FALSE, message = FALSE}
-testSetProbs <- 
-  data.frame(class = datTest$lc_change,
-             probs = predict(Model6, datTest, type="response")) 
-  
-ggplot(testSetProbs, aes(probs)) +
-  geom_density(aes(fill=class), alpha=0.5) +
-  scale_fill_manual(values = palette2,
-                    labels=c("No Change","New Development")) +
-  labs(title = "Histogram of test set predicted probabilities",
-       x="Predicted Probabilities",y="Density") +
-  plotTheme
-```
-
-## 4.3. Accuracy
-
-Now to pick a predicted probability threshold to classify an area as having new development. Recall, *Sensitivity* or the True Positive rate is the proportion of actual positives (1’s) that were predicted to be positive. For example, the Sensitivity in our model is the rate of developed areas actually predicted as such. *Specificity* or True Negative Rate is the proportion of actual negatives (0’s) that were predicted to be negatives. For example, the Specificity in our model is the rate of No Change areas that were correctly predicted as No change.
-
-It is important to consider what Planners would typically optimize for given this use case. One approach is to maximize the number of 1’s predicted correctly (Sensitivity) so as to not under or over-predict new development. It may okay in this use case to incorrectly predict no change as changed (Specificity). An abundance of False Negative errors may be reasonable if Planners don’t mind over emphasizing development potential. It is important to remember that below this potential will evaluated alongside supply-side indicators such as the presence of sensitive land.
-
-There are some clear tradeoffs between Sensitivity and Specificity in our model that deserve some exploration. To illustrate, two different thresholds of 5% and 17% are explored. Predicted classes for both thresholds are generated and instead of using the `confusionMatrix` function from `caret` as we have in the past, here confusion matrix metrics are derived from the `yardstick` package. This allows us to `group_by` the threshold and `summarize` the metrics of interest.
-
-The `options` call below is required to tell `yardstick` that the positive factor class in `testSetProbs` is `1`. Without it, yardstick will by default, see the first factor level as `0` and flip the confusion metrics around.
-
-```{r, warning = FALSE, message = FALSE}
-options(yardstick.event_first = FALSE)
-
-testSetProbs <- 
-  testSetProbs %>% 
-  mutate(predClass_05 = as.factor(ifelse(testSetProbs$probs >= 0.05 ,1,0)),
-         predClass_17 = as.factor(ifelse(testSetProbs$probs >= 0.17 ,1,0))) 
-
-testSetProbs %>%
-  dplyr::select(-probs) %>%
-  gather(Variable, Value, -class) %>%
-  group_by(Variable) %>%
-  summarize(Sensitivity = round(yardstick::sens_vec(class,factor(Value)),2),
-            Specificity = round(yardstick::spec_vec(class,factor(Value)),2),
-            Accuracy = round(yardstick::accuracy_vec(class,factor(Value)),2)) %>% 
-  kable() %>%
-  kable_styling(full_width = F)
-```
-
-The 5% threshold correctly predicts a higher number of new development areas (Sensitivity), but incorrectly predicts a lower number of no change areas (Specificity). As there are far more no change areas in the data, this is reflected in a lower overall accuracy. Conversely, the 17% threshold has a lower Sensitivity rate and but a far higher Specificity rate. Again, because of the dataset is majority no change areas, this leads to a far higher Accuracy rate.
-
-Given the use case, and the spatial distribution of land cover change, it may be more useful to have a model that predicts generally where new development occurs rather than one that predicts precisely where. As illustrated below, the 17% threshold provides this outcome. These trade-offs can be visualized in the plot below. Here the model is used to predict for the entire `dat` dataset. Which threshold looks more reasonable given the distribution of observed development change?
-
-Note that these indicators are converted `as.factor` so they can be mapped with `scale_color_manual`.
-
-```{r, warning = FALSE, message = FALSE}
-predsForMap <-         
-  dat %>%
-    mutate(probs = predict(Model6, dat, type="response") ,
-           Threshold_5_Pct = as.factor(ifelse(probs >= 0.05 ,1,0)),
-           Threshold_17_Pct =  as.factor(ifelse(probs >= 0.17 ,1,0))) %>%
-    dplyr::select(lc_change,Threshold_5_Pct,Threshold_17_Pct) %>%
-    gather(Variable,Value, -geometry) %>%
-    st_cast("POLYGON")
-```
-
-
-<div class="superbigimage">
-```{r, warning = FALSE, message= FALSE, fig.height = 6, fig.width= 8}
-ggplot() +
-  geom_point(data=predsForMap, aes(x=xyC(predsForMap)[,1], y=xyC(predsForMap)[,2], colour=Value)) +
-  facet_wrap(~Variable) +
-  scale_colour_manual(values = palette2, labels=c("No Change","New Development"),
-                      name="") +
-  labs(title="Development Predictions - Low Threshold") + 
-  theme_void()
-```
-</div>
-
-To provide a bit more insight, the code block below produces both true positives (Sensitivity) and true negatives (Specificity) for each grid cell by threshold type. Notice how the spatial pattern of Sensitivity for both thresholds is relatively consistent, but the 5% threshold misses most the study area with respect to Specificity.
-
-```{r, warning = FALSE, message = FALSE}
-ConfusionMatrix.metrics <-
-  dat %>%
-    mutate(probs = predict(Model6, dat, type="response") ,
-           Threshold_5_Pct = as.factor(ifelse(probs >= 0.05 ,1,0)),
-           Threshold_17_Pct =  as.factor(ifelse(probs >= 0.17 ,1,0))) %>%
-    mutate(TrueP_05 = ifelse(lc_change  == 1 & Threshold_5_Pct == 1, 1,0),
-           TrueN_05 = ifelse(lc_change  == 0 & Threshold_5_Pct == 0, 1,0),
-           TrueP_17 = ifelse(lc_change  == 1 & Threshold_17_Pct == 1, 1,0),
-           TrueN_17 = ifelse(lc_change  == 0 & Threshold_17_Pct == 0, 1,0)) %>%
-    dplyr::select(., starts_with("True")) %>%
-    gather(Variable, Value, -geometry) %>%
-    st_cast("POLYGON") 
-```
-
-<div class="superbigimage">
-```{r, warning = FALSE, message = FALSE, fig.height= 8, fig.width= 8 }
-ggplot(data=ConfusionMatrix.metrics) +
-  geom_point(aes(x=xyC(ConfusionMatrix.metrics)[,1], 
-                 y=xyC(ConfusionMatrix.metrics)[,2], colour = as.factor(Value))) +
-  facet_wrap(~Variable) +
-  scale_colour_manual(values = palette2, labels=c("Correct","Incorrect"),
-                       name="") +
-  labs(title="Development Predictions - Low Threshold") + theme_void()
-```
-</div>
-
-## 4.4 Generalizability
-
-For this use case, it matters little whether the model generalizes well across random holdouts. Thus, regular cross-validation is substituted for spatial cross-validation. The latter is explicitly concerned with generalizability across space. The approach helps us understand whether our model is comparable to each county in the study area despite any possible differences in land use or land use planning.
-
-To test across-space generalizability, `spatialCV` function is run, which iteratively loops through `dat` having each county take a turn as the hold out test set. This is also called ‘Leave-one-group-out cross validation.’. A model is estimated for the n - 1 counties that remain and used to `predict` for the hold out county.
-
-```{r, warning = FALSE, message = FALSE}
-spatialCV <- function(dataFrame, uniqueID, dependentVariable, modelName) {
-
-#initialize a data frame 
-endList <- list()
-
-#create a list that is all the spatial group unqiue ids in the data frame (ie counties)    
-  uniqueID_List <- unique(dataFrame[[uniqueID]])  
-  x <- 1
-  y <- length(uniqueID_List)
-  
-#create a counter and while it is less than the number of counties...  
-  while(x <= y) 
-  {
-#call a current county    
-    currentUniqueID <- uniqueID_List[x]
-#create a training set comprised of units not in that county and a test set of units
-#that are that county
-    training <- dataFrame[ which(dataFrame[[uniqueID]] != uniqueID_List[x]),]
-    testing <- dataFrame[ which(dataFrame[[uniqueID]] == uniqueID_List[x]),]
-#create seperate xy vectors
-    trainingX <- training[ , -which(names(training) %in% c(dependentVariable))]
-    testingX <- testing[ , -which(names(testing) %in% c(dependentVariable))]
-    
-    trainY <- training[[dependentVariable]]
-    testY <- testing[[dependentVariable]]
-#Calculate predictions on the test county as part of a data frame including the observed
-#outcome and the unique county ID    
-   thisPrediction <- 
-     data.frame(class = testY,
-                probs = predict(modelName, testingX, type="response"),
-                county = currentUniqueID) 
-
-#Row bind the predictions to a data farme
-   endList <- rbind(endList, thisPrediction)
-#iterate counter    
-    x <- x + 1 
-  } 
-#return the final list of counties and associated predictions  
-  return (as.data.frame(endList))
-}
-```
-
-Now the function is run; a 17% predicted probability threshhold is set and a facetted ROC plot for each county is created. It is important to note that Chambers, Austin, Waller, Liberty and San Jacinto each have ony between 1 and 13 grid cells that actually developed, so the below goodness of fit metrics are likely not useful.
-
-```{r, warning = FALSE, message = FALSE}
-spatialCV_counties <-
-  spatialCV(dat,"NAME","lc_change", Model6) %>%
-  mutate(predClass = as.factor(ifelse(probs >= 0.17 ,1,0)))
-```
-
-To investigate the across-county generalizability of the model, the code block below produces and maps confusion matrix statistics by county. It is important to ensure as above, that the `yardstick.event_first` option is set.
-
-Some interesting patterns emerge. First, results for those counties with little `Observed_Change` are not meaningful. In places with substantial new development, Sensitivity rates are comparable with the results from the test set results on the entire study area. Harris County which contains the City of Houston, has the greatest Sensitivity level, which is reasonable given it contains most of the development. Specificity is low across the board, because the model predicts an abundance of developed areas. Again, this is less of a concern because these estimates will be offset by sensitive land cover in Section 7 below. For the most part, these confusion matrix metrics suggest the model is generalizable to those counties that underwent significant development change.
-
-```{r, warning = FALSE, message = FALSE}
-spatialCV_metrics <-
-  spatialCV_counties %>% 
-    group_by(county) %>% 
-    summarize(Observed_Change = sum(as.numeric(as.character(class))),
-              Sensitivity = round(yardstick::sens_vec(class,predClass),2),
-              Specificity = round(yardstick::spec_vec(class,predClass),2),
-              Accuracy = round(yardstick::accuracy_vec(class,predClass),2)) 
-
-spatialCV_metrics %>%
-  kable() %>%
-  kable_styling(full_width = F)
-```
-
-# 5. Predicting Land Cover Demand for 2020
-
-At this point, a simple but useful model has been trained to predict urban development between 2001 and 2011 as a function of baseline features from 2001 including land cover, built environment and population. Next, we are going to updated our features to reflect a 2010 baseline. Having done so, predictions from our new model would then be fore 2020.
-
-Generalizability is always the concern when forecasting, and for this use case Planners must ask themselves whether the 2001-2011 Houston experience generalizes to the 2010-2020 Houston experience. In other words, have the macroeconomic real estate conditions changed dramatically between the two time periods? This is question with no definitive answer, but it useful to consider the exogenous factors that may differentiate today’s Houston from that of 2011. The big for instance is climate change, and the aftermath of Hurricane Harvey. In August of 2017 Harvey devastated large portions of this region causing $125 billion in damage. If the real estate market capitalized flood risk into devastated areas going forward, this would effectively change the nature of real estate demand in the region. Thus the pre-flood, 2011 experienced is no longer entirely relevant.
-
-This would not completely invalidate the model if these changes are marginal, as development demand predictions can be adjusted in Section 7 below. However, consider the usefulness of this approach for a coastal city that looses say 10% of its developable land to sea level rise in the following decade.
-
-For brevity, we only update two features in our model. First, population change (`pop_change`) is updated using county level population projections visualized in the plot below. The second is `lagDevelopment`, which describes how predicted new development relates in space to old development.
-
-Once the features are updated, 2020 predictions are estimated and mapped.
-
-Below, `lagDevelopment` is mutate describing average distance to 2010 development. Note that the field name, `lagDevelopment` is unchanged (ie. not updated to `lagDevelopment_2010`). This is done purposefully as model6 has a regression coefficient called `lagDevelopment`. If this variable wasn’t present in our updated data frame then the `predict` command would fail.
-
-```{r, warning = FALSE, message = FALSE}
-dat <-
-  dat %>%
-  mutate(lagDevelopment = nn_function(xyC(.), xyC(filter(.,developed10 == 1)),2))
-```
-
-Now to update population change. A new data frame, `countyPopulation_2020` is created which includes 2010 population counts and 2020 projections for each county in the study area. Population is plotted by year and by county. Houston’s Harris County is projected to see the greatest population gains by far. Anecdotally, we know that much of Harris County is already developed, which suggests its development scenario will involve more ‘infill’ development then sprawl.
-
-_MF Note: This chart has been altered from a stacked bar plot to a paired bar plot._
-
-```{r, warning = FALSE, message = FALSE}
-countyPopulation_2020 <- 
-  data.frame(
-   NAME = 
-     c("Fort Bend","San Jacinto","Waller","Galveston","Harris","Liberty","Chambers",
-       "Brazoria","Austin","Montgomery"),
-   county_projection_2020 = 
-     c(888595,32428,58002,335006,4885616,90780,47621,410571,36542,660481)) %>%
-   left_join(
-     dat %>%
-       st_set_geometry(NULL) %>%
-       group_by(NAME) %>%
-       summarize(county_population_2010 = round(sum(pop_2010))))
-
-countyPopulation_2020 %>%
-  gather(Variable,Value, -NAME) %>%
-  ggplot(aes(reorder(NAME,-Value),Value)) +
-  geom_bar(aes(fill=Variable), stat = "identity", position = "dodge") +
-  scale_fill_manual(values = palette2,
-                    labels=c("2020","2010"),
-                    name="Population") +
-  labs(title="Population Change by County: 2010 - 2020",
-       x="County", y="Population") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  plotTheme
-```
-
-## 5.2. Predicting Development Demand
-
-Next, the `countyPopulation_2020` table is joined to `dat` and `pop_change` in order to ‘distribute’ the new population across the study area. To do so, the the allocation of new population is weighted by a grid cell’s existing population (`pop_2020.infill`). 2010 population is subtracted from this figure to get `pop_Change`. Finally, `Model6` is used to predict for 2020 given the updated population change and lag development features.
-
-The map of predicted probabilities that results is best thought of as a measure of predicted development demand in 2020.
-
-```{r, warning = FALSE, message = FALSE}
-dat_infill <-
-  dat %>%
-  #calculate population change
-    left_join(countyPopulation_2020) %>%
-    mutate(proportion_of_county_pop = pop_2010 / county_population_2010,
-           pop_2020.infill = proportion_of_county_pop * county_projection_2020,
-           pop_Change = round(pop_2020.infill - pop_2010),2) %>%
-    dplyr::select(-county_projection_2020, -county_population_2010, 
-                  -proportion_of_county_pop, -pop_2020.infill) %>%
-  #predict for 2020
-    mutate(predict_2020.infill = predict(Model6,. , type="response"))
-
-dat_infill %>%
-  ggplot() +  
-  geom_point(aes(x=xyC(dat_infill)[,1], y=xyC(dat_infill)[,2], colour = factor(ntile(predict_2020.infill,5)))) +
-  scale_colour_manual(values = palette5,
-                    labels=substr(quintileBreaks(dat_infill,"predict_2020.infill"),1,4),
-                    name="Quintile\nBreaks") +
-  geom_sf(data=studyAreaCounties, fill=NA, colour="black", size=1) +
-  labs(title= "Development Demand in 2020: Predicted Probabilities") +
-  theme_void()
-```
-
-# 6. Comparing Predicted Development Demand & Environmental Sensitivity
-
-We now have a really strong indicator of development demand for 2020 to help guide local land use planning. Demand however, is only one side of the equation. It must balanced with the supply of environmentally sensitive land. Understanding the interplay between demand and supply is the first stage of the ‘Allocation’ phase, where Planners ultimately decide which land should be developed and which should not.
-
-For this analysis farmland and undeveloped land are be deemed `Suitable`, while environmentally sensitive areas like wetlands and forest are be deemed `Not Suitable`. Below, 2011 land cover data is read in and several measures of environmental sensitivity are created by county. These include:
-
-1. The total amount of wetlands and forest land cover area in 2011.
-2. The amount of sensitive land (wetland and forest) lost between 2001 and 2011.
-3. The total area of large sensitive landscape ‘patches’ in 2011.
-
-The third metric warrants some further discussion. In the context of leapfrog development, Section 2.6 discusses the concept of landscape fragmentation - the idea that discontinuous development across space carves out disjointed slivers of wilderness. This fragmentation reduces biodiversity particularly for species that need room to roam. Below, environmentally `sensitive_regions` are created to represent large areas of unfragmented natural resources. We then consider the total area of these clumps for each county.
-
-## 6.2. 2011 Land Cover Data
-
-To begin, the 2011 Land Cover data is read in and reclassified.
-
-```{r, warning = FALSE, message = FALSE}
-lc_2011 <- raster("https://github.com/mafichman/CPLN_675/raw/main/Week_14_15/data/UGB_Chapter_data/lc_2011_4k.tif")
-
-developed11 <- lc_2011 == 21 | lc_2011 == 22 | lc_2011 == 23 | lc_2011 == 24
-forest11 <- lc_2011 == 41 | lc_2011 == 42 | lc_2011 == 43 
-farm11 <- lc_2011 == 81 | lc_2011 == 82 
-wetlands11 <- lc_2011 == 90 | lc_2011 == 95 
-otherUndeveloped11 <- lc_2011 == 52 | lc_2011 == 71 | lc_2011 == 31 
-water11 <- lc_2011 == 11
-
-names(developed11) <- "developed11"
-names(forest11) <- "forest11"
-names(farm11) <- "farm11"
-names(wetlands11) <- "wetlands11"
-names(otherUndeveloped11) <- "otherUndeveloped11"
-names(water11) <- "water11"
-
-ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_raster(data = rbind(rast(lc_2001) %>% mutate(label = "2001"),
-                           rast(lc_2011) %>% mutate(label = "2011")) %>% 
-              na.omit %>% filter(value > 0), 
-              aes(x,y,fill=as.factor(value))) +
-  facet_wrap(~label) +
-  scale_fill_viridis(discrete=TRUE, name ="") +
-  labs(title = "Land Cover, 2001 & 2011a") +
-  theme_void() + theme(legend.position = "none")
-```
-
-Next, each raster is aggregated to the fishnet using the `aggregateRaster` function and 2011 land cover types are mapped.
-
-```{r, warning = FALSE, message = FALSE}
-theRasterList11 <- c(developed11,forest11,farm11,wetlands11,otherUndeveloped11,water11)
-
-dat2 <-
-  aggregateRaster(theRasterList11, dat) %>%
-  dplyr::select(developed11,forest11,farm11,wetlands11,otherUndeveloped11,water11) %>%
-  st_set_geometry(NULL) %>%
-  bind_cols(.,dat) %>%
-  st_sf() %>%
-  st_cast("POLYGON")
-
-dat2 %>%
-  gather(var,value,developed11:water11) %>%
-  st_centroid() %>%
-  mutate(X = st_coordinates(.)[,1],
-         Y = st_coordinates(.)[,2]) %>%
-  ggplot() +
-    geom_sf(data=houstonMSA) +
-    geom_point(aes(X,Y, colour=as.factor(value))) +
-    facet_wrap(~var) +
-    scale_colour_manual(values = palette2,
-                        labels=c("Other","Land Cover"),
-                        name = "") +
-    labs(title = "Land Cover Types, 2011",
-         subtitle = "As fishnet centroids") +
-   theme_void()
-```
-
-## 6.3. Sensitive Land Cover Lost
-
-Below an indicator `sensitive_lost` is created indicating grid cells that were either forest or wetlands in 2001 but were no longer so in 2011. The output layer, `sensitive_land_lost`, gives a sense for how development in the recent past has effected the natural environment.
-
-```{r, warning = FALSE, message = FALSE, fig.height = 6, fig.width= 6}
-dat2 <-
-  dat2 %>%
-   mutate(sensitive_lost11 = ifelse(forest == 1 & forest11 == 0 |
-                                    wetlands == 1 & wetlands11 == 0,1,0))
-                      
-ggplot() +
-  geom_point(data=dat2, aes(x=xyC(dat2)[,1], y=xyC(dat2)[,2], colour=as.factor(sensitive_lost11))) +
-  scale_colour_manual(values = palette2,
-                      labels=c("No Change","Sensitive Lost"),
-                      name = "") +
-  labs(title = "Sensitive lands lost: 2001 - 2011",
-       subtitle = "As fishnet centroids") +
-  theme_void()
-```
-
-## 6.4 Landscape Fragmentation
-
-In this section, the `wetlands11` and `forest11` rasters are converted to contiguous `sensitive_regions` using the `raster::clump` function. This is equivalent to Region Group in ArcGIS. The raster clumps are then converted to vector `sf` layers; dissolved into unique regions; Acres are calculated; and the layers are converted back to raster to be extracted back to the fishnet with `aggregateRaster`. It is worth going through this code block line by line. Note that only `sensitive_regions` with areas greater than 1 acre are included.
-
-```{r, warning = FALSE, message = FALSE, fig.height = 6, fig.width= 6}
-sensitiveRegions <- 
-  raster::clump(wetlands11 + forest11) %>%
-  rasterToPolygons() %>%
-  st_as_sf() %>%
-  group_by(clumps) %>% 
-  summarize() %>%
-    mutate(Acres = as.numeric(st_area(.) * 0.0000229568)) %>%
-    filter(Acres > 3954)  %>%
-  dplyr::select() %>%
-  raster::rasterize(.,emptyRaster) 
-sensitiveRegions[sensitiveRegions > 0] <- 1  
-names(sensitiveRegions) <- "sensitiveRegions"
-
-dat2 <-
-  aggregateRaster(c(sensitiveRegions), dat2) %>%
-  dplyr::select(sensitiveRegions) %>%
-  st_set_geometry(NULL) %>%
-  bind_cols(.,dat2) %>%
-  st_sf()
-
-ggplot() +
-  geom_point(data=dat2, aes(x=xyC(dat2)[,1], y=xyC(dat2)[,2], colour=as.factor(sensitiveRegions))) +
-  scale_colour_manual(values = palette2,
-                      labels=c("Other","Sensitive Regions"),
-                      name="") +
-  labs(title = "Sensitive regions",
-       subtitle = "Continous areas of either wetlands or forests\ngreater than 1 acre") +
-  theme_void()
-```
-
-## 6.5. Summarize by County
-
-The below `dplyr` statement takes as its input, `dat2`, which was created in Sections 6.2 - 6.4 and wrangles together a table of county-level, supply and demand metrics which can be used to analyze suitability by county.
-
-```{r, warning = FALSE, message = FALSE}
-county_specific_metrics <- 
-  dat2 %>%
-  #predict development demand from our model
-  mutate(Development_Demand = predict(Model6, dat2, type="response")) %>%
-  #get a count count of grid cells by county which we can use to calculate rates below
-  left_join(st_set_geometry(dat, NULL) %>% group_by(NAME) %>% summarize(count = n())) %>%
-  #calculate summary statistics by county
-  group_by(NAME) %>%
-  summarize(Total_Farmland = sum(farm11) / max(count),
-            Total_Forest = sum(forest11) / max(count),
-            Total_Wetlands = sum(wetlands11) / max(count),
-            Total_Undeveloped = sum(otherUndeveloped11) / max(count),
-            Sensitive_Land_Lost = sum(sensitive_lost11) / max(count),
-            Sensitive_Regions = sum(sensitiveRegions) / max(count),
-            Mean_Development_Demand = mean(Development_Demand)) %>%
-  #get population data by county
-  left_join(countyPopulation_2020 %>% 
-            mutate(Population_Change = county_projection_2020 - county_population_2010,
-                   Population_Change_Rate = Population_Change / county_projection_2020) %>%
-            dplyr::select(NAME,Population_Change_Rate))
-```
-
-
-Now a small multiple plot can be created providing both supply and demand side analytics by county. The plot gives a sense for development demand (`Demand-Side`), suitable land for development (`Suitable`) and sensitive land (`Not Suitable`).
-
-In Fort Bend County, an area west of Houston, the data suggests both population and development demand will increase. At the same time, there is a high rate of developable farmland and a low supply of sensitive land. Fort Bend is well suitable to new development.
-
-Conversely, San Jacinto, the county north and east of Houston, contains some of the highest rates of sensitive land use in the region. There is a very large National Forest in this area. In most counties, there are some real trade-offs to be made between suitable/sensitive land and development pressure.
-
-```{r, warning = FALSE, message = FALSE}
-county_specific_metrics %>%
-  gather(Variable, Value, -NAME, -geometry) %>%
-  mutate(Variable = factor(Variable, levels=c("Population_Change_Rate","Mean_Development_Demand",
-                                              "Total_Farmland","Total_Undeveloped","Total_Forest",
-                                              "Total_Wetlands","Sensitive_Land_Lost","Sensitive_Regions",
-                                              ordered = TRUE))) %>%
-  mutate(Planning_Designation = case_when(
-    Variable == "Population_Change_Rate" | Variable == "Mean_Development_Demand" ~ "Demand-Side",
-    Variable == "Total_Farmland" | Variable == "Total_Undeveloped"               ~ "Suitable",
-    TRUE                                                                         ~ "Not Suitable")) %>%
-  ggplot(aes(x=Variable, y=Value, fill=Planning_Designation)) +
-    geom_bar(stat="identity", position=position_dodge(), colour="black") +
-    facet_wrap(~NAME, ncol=5) +
-    coord_flip() +
-    scale_y_continuous(breaks = seq(.25, 1, by = .25)) +
-    geom_vline(xintercept = 2.5) + geom_vline(xintercept = 4.5) +
-    scale_fill_manual(values=c("black","red","darkgreen")) +
-    labs(title= "County Specific Allocation Metrics", subtitle= "As rates", x="Indicator", y="Rate") +
-    plotTheme + theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position="bottom")
-```
-
-# 7. Allocation
-
-Allocation is the final stage of the urban growth modeling process. Now that both demand and supply is understood, Planners can allocate development rights accordingly. Of course, this could take many forms of regulation including zoning, subdivision approval or outright conservation. In this section, demand and supply are visualized for two counties, Fort Bend and Montgomery. The data suggests that the former is more conducive to growth while the latter, less so.
-
-First, development demand is predicted for Fort Bend. Then a layer, `fortBend_landUse` is created, that includes indicators for both previously developed land and environmentally unsuitable land. This layer then is overlayed atop development demand and projected population change to give the full supply and demand-side picture in Fort Bend.
-
-There are some clear opportunities for development in Fort Bend. Significant infill opportunities exist along the northeast boundary where population change is projected to be greatest. There is also a good deal of environmentally suitable land in the center of the county around a highway interchange. This would be ideal space for large footprint, suburban shopping.
-<div class="superbigimage">
-```{r, warning = FALSE, message = FALSE, fig.height= 8, fig.width= 11}
-fortBend <-
-  dat2 %>%
-    mutate(Development_Demand = predict(Model6, dat2, type="response")) %>%
-    filter(NAME == "Fort Bend") 
-
-fortBend_landUse <- rbind(
-  filter(fortBend, forest11 == 1 | wetlands11 == 1 ) %>%
-  dplyr::select() %>% mutate(Land_Use = "Not Suitable"),
-  filter(fortBend, developed11 == 1) %>%
-  dplyr::select() %>% mutate(Land_Use = "Developed"))
-
-grid.arrange(
-ggplot() +
-  geom_sf(data=fortBend, aes(fill=factor(ntile(Development_Demand,5))), colour=NA) +
-  geom_point(data=fortBend_landUse, aes(x=xyC(fortBend_landUse)[,1], 
-                                        y=xyC(fortBend_landUse)[,2], colour=Land_Use),
-                                        shape = 15, size = 2) +
-  geom_sf(data=st_intersection(houstonHighways,filter(studyAreaCounties, NAME=="Fort Bend")), size=2) +
-  scale_fill_manual(values = palette5, name="Development\nDemand",
-                    labels=substr(quintileBreaks(fortBend,"Development_Demand"),1,5)) +
-  scale_colour_manual(values = c("black","red")) + 
-  labs(title = "Development Potential, 2020: Fort Bend") + theme_void() +
-  guides(fill = guide_legend(order = 1), colour = guide_legend(order = 2)),
-
-ggplot() +
-  geom_sf(data=fortBend, aes(fill=factor(ntile(pop_Change,5))), colour=NA) +
-  geom_point(data=fortBend_landUse, aes(x=xyC(fortBend_landUse)[,1], 
-                                        y=xyC(fortBend_landUse)[,2], colour=Land_Use),
-                                        shape = 15, size = 2) +
-  geom_sf(data=st_intersection(houstonHighways,filter(studyAreaCounties, NAME=="Fort Bend")), size=2) +
-  scale_fill_manual(values = palette5, name="Population\nChange",
-                    labels=substr(quintileBreaks(fortBend,"pop_Change"),1,5)) +
-  scale_colour_manual(values = c("black","red")) + 
-  labs(title = "Projected Population, 2020: Fort Bend") + theme_void() +
-  guides(fill = guide_legend(order = 1), colour = guide_legend(order = 2)), ncol=2)
-```
-</div>
-The plots above are created using a `ggplot` trick to show what appears to be overlayed polygons (fishnet grid cells). ggplot does not natively allow multiple aesthetics (`aes`) of the same style. In practice, this means it is not possible to have two `scale_fill_manual` parameters and thus, two legends for the same map. This limitation is cleverly avoided by plotting `fortBend_landUse` as colored points (as opposed to filled grid cells). In the `geom_point` parameter above, the points are set to `shape = 15`, which is a filled box. This box can then be sized to make it appear like a fishnet grid cell.
-
-For comparison purposes, this process is replicated for Montgomery County below. There is far more environmentally sensitive land here relative to Fort Bend. Any new development would have to be diffuse and likely adjacent to highways.
-
-We stop short in actually allocating land to development. While the model is well suited for understanding sprawl-style development, it is not useful for understanding how new demand might be absorbed by upzoning and densification of existing development. It would not be wise to allocate the entire projected population to undeveloped land. Instead, we’d prefer a more nuanced understanding of how local land use laws might play a role. At this stage in the analysis however, the Planner has all she needs to engage local stakeholders about future development decisions.
-
-![Montgomery County](https://raw.githubusercontent.com/mafichman/CPLN_675/main/Week_14_15/images/montgomery.png)
-
-
-# 8. Appendix
-
-_This is new material describing how you can determine land cover change from land cover rasters for two time periods_
-
-## 8.1. Calculating Land Cover Change
-
-For your assignment, you are going to need to get land cover data for two new time periods and figure out what areas developed in that interval (and then model it). In the workflow above, we used a the NLCD land cover change data set, but we could also have calculated our own version using the 2001 and 2011 data sets. You could do this in R, or ArcGIS for your assignment. Here is an abbreviated workflow for doing it in R using the data from this exercise:
-
-Reclassify 2001 and 2011 land cover databases to consist of 1 and 0 observations (e.g. 1 is the developed classes 13-24, 0 is everything else). 
+We create a matrix called `reclassMatrix` with reclassification instructions for the `reclassify` function in the `raster` package.
 
 ```{r}
 reclassMatrix <- 
@@ -1346,85 +363,329 @@ reclassMatrix <-
   ncol=3, byrow=T)
 ```
 
-```{r, warning = FALSE, message = FALSE}
-developed_2001 <- 
-  reclassify(lc_2001,reclassMatrix)
 
+
+```{r, warning = FALSE, message = FALSE}
 developed_2011 <- 
-  reclassify(lc_2011,reclassMatrix)
+  reclassify(lc_2011_rs, reclassMatrix)
+
+developed_2019 <- 
+  reclassify(lc_2019_rs, reclassMatrix)
 
 ```
 
-Then do some map algebra to find the places where land cover changed. Let's see a quick histogram of the values - these should range from 0 (undeveloped in 2001, undeveloped in 2011), 1 (undeveloped in 2001, developed in 2011 (presuming nothing went from developed to undeveloped)), and 2 (developed in both periods). The 1's represent the change.
+
+We can do some map algebra to find the places where land cover changed. 
+
+Notice we can do map algebra really simply with the `raster` package by merely writing an equation. This is similar to how we do it in ArcGIS.
+
 
 ```{r, warning = FALSE, message = FALSE}
 
-development_change <- developed_2001+developed_2011
+development_change <- developed_2011 + developed_2019
 
+```
+
+Let's see a quick histogram of the values - these should range from 0 (undeveloped in 2001, undeveloped in 2011), 1 (undeveloped in 2001, developed in 2011 (presuming nothing went from developed to undeveloped)), and 2 (developed in both periods). 
+
+The 1's represent the change.
+
+```{r, warning = FALSE, message = FALSE}
 hist(development_change)
 ```
 
-We can subsequently turn any of the 0's and 1's to NA
+We can turn any of the 0's and 2's to NA, leaving only 1's and NA.
 
 ```{r, warning = FALSE, message = FALSE}
 development_change[development_change != 1] <- NA
+```
 
+## 3.3. Examining Land Cover Change
+
+Let's use Mapview to take a look at the `development_change` raster (yes you can make a quick webmap of these rasters - easy!)
+
+```{r}
+mapView(development_change)
+
+```
+
+# 4. Creating the Fishnet
+
+We will do our modeling in a "fishnet" - a vector grid which is uniform and raster-like. Each cell has a row in a table - we will need a data frame object to feed to our modeling workflow. We will create our fishnet at the same resolution (e.g. cell size) and CRS as our raster data
+
+The `st_make_grid` function can do this for us by making a fishnet called `houstonMSA_fishnet` at the scale of our `houstonMSA` - our study area. Note the following things that we do in this function.
+
+We `st_transform` the `houstonMSA` to the crs of `development_change` - that's the basis for our grid.
+
+We set `cellsize` argument the `res` (aka resolution) of `development_change`.
+
+Use the `st_sf` function to ensure that our data are in `sf` format (the st_make_grid function returns a different kind of spatial object by devault)
+
+We "clip" the grid to the `houstonMSA` using `st_intersection` - making sure that the MSA data contain only the geometry, projected in the same crs as `development_change`.
+
+And then `mutate` a column in our data set called `uniqueID` - we will need to have a unique ID for each row in our data in case we need to make some tabular joins.
+
+```{r, warning = FALSE, message = FALSE}
+houstonMSA_fishnet <- 
+  st_make_grid(houstonMSA %>%
+                     st_transform(crs(development_change)),
+                 cellsize = res(development_change)[1], 
+                 square = TRUE) %>% 
+  st_sf() %>% 
+  st_intersection(., houstonMSA %>%
+                    dplyr::select(geometry) %>%
+                         st_transform(crs(development_change))) %>%
+  mutate(uniqueID = rownames(.))
+```
+
+# 5. Join Raster Data to the Fishnet
+
+How do we get all of our raster data into the fishnet? How do we get our development change to show up as a 1/0 variable in a given column? In our models we will want to parameterize things like existing land use, or distance to the nearest highway - how do we create columns for those? The simple answer - t we convert our rasters to points, and then spatially join them to our fishnet.
+
+## 5.1. Aggregating LC Change to fishnet
+
+Let's do a single aggregation below to demonstrate the workflow. You can use this workflow to take any kind of raster data you'd like and coerce it to the fishnet. Later we will demonstrate a batch conversion workflow you can use to get all of your land cover rasters in to a fishnet as a group.
+
+The function `rasterToPoints` (from the `raster` package) turns our raster into a centroid with an `x` and `y` coordinate from its native projection. We can turn this into an `sf` object using `st_as_sf` and specifying the crs as that of `houstonMSA_fishnet`.
+
+Then, we create a fishnet called (creatively) `fishnet` - this will be the core grid we use to build our modeling variables. 
+
+We use the `aggregate` function from the `sf` pacakge to summarize the `changePoints` - note that we use the `sum` argument for the `FUN` argument (e.g. "function") - you could use a min, max, mean etc., in this argument. This creates an sf object that has two columns - `layer` - which has values that correspond to those of the raster.
+
+If you were to run the following code - `aggregate(changePoints, houstonMSA_fishnet, FUN=sum) %>% group_by(layer) %>% tally()` you would see a summary of that column. When we run our aggregate function, we get 1's and NAs.
+
+We pipe in a `mutate` command to specify that there is a new column in `fishnet` we'd like to call `development_change`. We populate it with values from an if_else statement - if layer is NA, make it a 0, if it's not, make it a 1. We make sure this is a factor variable.
+
+Then we use a select statement to remove the column `layer`.
+
+```{r}
+changePoints <-
+  rasterToPoints(development_change) %>%
+  as.data.frame() %>%
+  st_as_sf(coords = c("x", "y"), 
+           crs = st_crs(houstonMSA_fishnet))
+
+fishnet <- 
+  aggregate(changePoints, 
+            houstonMSA_fishnet, 
+            FUN=sum) %>%
+  mutate(development_change = ifelse(is.na(layer) == TRUE , 0, 1),
+         development_change = as.factor(development_change)) %>%
+  dplyr::select(-layer)
+
+```
+
+
+How does it look?
+
+Here we make a plot with a little custom function inside our geom_point data - `xyC` turns fishnets into centroids so we can plot them much more quickly than polygons. Fun trick.
+
+```{r}
 ggplot() +
-  geom_sf(data=houstonMSA) +
-  geom_raster(data=rast(development_change) %>% 
-                na.omit, 
-              aes(x,y,fill=as.factor(value))) +
-  scale_fill_viridis(discrete=TRUE, name ="Land Cover\nChange") + 
-  labs(title="Development land use change") +
+  geom_sf(data=houstonMSA %>% 
+            st_transform(crs(fishnet))) +
+  geom_point(data=fishnet, 
+             aes(x=xyC(fishnet)$x, 
+                 y=xyC(fishnet)$y, 
+                 colour=development_change)) +
+  scale_colour_manual(values = palette2,
+                      labels=c("No Change","New Development"),
+                      name = "") +
+  labs(title = "Land Cover Development Change", subtitle = "As fishnet centroids") +
   theme_void()
 ```
 
-## 8.2. Downsampling Rasters
 
-Notice that we used 4000x4000 unit grid cells in this analysis to keep small grid cell sizes from crushing our laptops while we did this plotting and geo-processing. This is very simple to do in R - the below code takes our `development_change` raster and downsamples it by a factor of two using the `aggregate` function. You could load an original data set in at the beginning of your analysis and downsample it before you get started.
+## 5.2. Aggregating Batch Land Cover Data to the Fishnet
 
-```{r, warning = FALSE}
+OK - we will need to reclassify our get all of our land cover data from `t1` and `t2` into a fishnet environment.  Doing that one raster at a time would be very tedious. I'm providing you with a custom function that can help you aggregate large lists of rasters, called `aggregateRaster`
 
-development_change
+### 5.2.1. Reclassifying land cover
 
-aggregate(development_change, fact = 2)
+We are going to recode our NLCD data into a few reduced categories to be used in our analysis. Here is the classification logic: 
 
-```
-
-## 8.3. Cropping Rasters
-Say you have rasters that you would like to manipulate in R instead of in ArcGIS. If you have data covering the study area, you can use this as the extent to which you would like to crop the data, and then use `mask` to clip the data to the exact boundaries.
-
-First, read in the resampled raster of land cover around Atlanta, Georgia from 2001 and then plot it.
-
-```{r message=FALSE, warning=FALSE}
-lc_atl_2001 <- raster("https://raw.githubusercontent.com/mafichman/CPLN_675/main/Week_14_15/data/atl_lc01_resamp_new.tif")
-
-plot(lc_atl_2001)
-```
+| Old_Classification             | New_Classification                                  |
+|--------------------------------|-----------------------------------------------------|
+| Open Space as well as Low, Medium and High Intensity Development | Developed |
+| Deciduous, Evergreen, and Mixed Forest |  Forest |
+| Pasture/Hay and Cultivated Crops | Farm |
+| Woody and Emergent Herbaceous Wetlands | Woodlands |
+| Barren Land, Dwarf Scrub, and Grassland/Herbaceous | Other Undeveloped |
+| Water | Water |
 
 
-We will also read in Atlanta counties for the extent of the bounding box, and then `crop` the raster to the counties.
+In the code block below, we create new rasters, descriptively called `developed_2011`, `forest_2011` etc , according to the NLCD codes that correspond to our classification scheme. 
 
-```{r message=FALSE, warning=FALSE}
-atl_counties <- st_read("https://raw.githubusercontent.com/mafichman/CPLN_675/main/Week_14_15/data/Counties_Atlanta_Region.geojson") %>% st_transform("ESRI:102667") # ESRI 1983 state plane GA west
+```{r, warning = FALSE, message = FALSE}
 
-lc_atl_2001_crop <- crop(lc_atl_2001, extent(atl_counties))
+developed_2011 <- lc_2011_rs  %in% c(21, 22, 23, 24)
+forest_2011 <- lc_2011_rs %in% c(41, 42, 42)
+farm_2011 <- lc_2011_rs %in% c(81, 82)
+wetlands_2011 <- lc_2011_rs %in% c(90, 95) 
+otherUndeveloped_2011 <- lc_2011_rs %in% c(52, 71, 31)
+water_2011 <- lc_2011_rs == 11
 
-plot(lc_atl_2001_crop)
-```
-
-
-Then, `mask` the raster using the Atlanta are counties. This is similar to the "clipping" process for vector data.
-
-```{r message=FALSE, warning=FALSE}
-lc_atl_2001_mask <- mask(lc_atl_2001_crop, atl_counties)
-plot(lc_atl_2001_mask)
+developed_2019 <- lc_2019_rs %in% c(21, 22, 23, 24)
+forest_2019 <- lc_2019_rs %in% c(41, 42, 42)
+farm_2019 <- lc_2019_rs %in% c(81, 82)
+wetlands_2019 <- lc_2019_rs %in% c(90, 95) 
+otherUndeveloped_2019 <- lc_2019_rs %in% c(52, 71, 31)
+water_2019 <- lc_2019_rs == 11
 ```
 
 
-## 8.4 Updated Census Data Calls
+### 5.2.2. Aggregating Rasters to the Fishnet
 
-In section 2.4, census data was pulled using the `get_decennial`; however, if you are using a different timeframe, you you will use data from the American Community Survey (ACS). You will replace `get_decennial` with `get_acs` in your project's workflow. The code chunk below shows how to use `get_acs` to obtain population data from the counties in the Houston MSA in 2019. Note that `get_acs` returns both an estimate (denoted with an "E") and a margin of error (denoted with an "M"). We use the `select` command in `dplyr` to only retain estimate version of the variable.
+We have two steps to prepare our rasters for batch aggregation. You should follow this workflow as-is when you build your urban growth model for your assignment.
+
+First, we apply `names` to our rasters. When we aggregate all the rasters, the `names` ensure that when the raster is integrated with the fishnet, the column reflects the appropriate raster.
+
+Second, we generate a list of land cover rasters for 2011, which we call `rasterList_2011`, and a list for 2019, which we call `rasterList_2019`. These are lists of objects that we can feed to `aggregateRaster` to instruct it which data to aggregate to fishnet.
+
+```{r, warning = FALSE, message = FALSE}
+
+names(developed_2011) <- "developed_2011"
+names(forest_2011) <- "forest_2011"
+names(farm_2011) <- "farm_2011"
+names(wetlands_2011) <- "wetlands_2011"
+names(otherUndeveloped_2011) <- "otherUndeveloped_2011"
+names(water_2011) <- "water_2011"
+
+names(developed_2019) <- "developed_2019"
+names(forest_2019) <- "forest_2019"
+names(farm_2019) <- "farm_2019"
+names(wetlands_2019) <- "wetlands_2019"
+names(otherUndeveloped_2019) <- "otherUndeveloped_2019"
+names(water_2019) <- "water_2019"
+```
+
+
+```{r, warning = FALSE, message = FALSE}
+rasterList_2011 <- c(developed_2011,
+                   forest_2011,
+                   farm_2011,
+                   wetlands_2011,
+                   otherUndeveloped_2011,
+                   water_2011)
+
+rasterList_2019 <- c(developed_2019,
+                   forest_2019,
+                   farm_2019,
+                   wetlands_2019,
+                   otherUndeveloped_2019,
+                   water_2019)
+```
+
+Lastly, we send our lists (e.g. `rasterList_2011`) and our basic fishnet (`houstonMSA_fishnet`) to `aggregateRaster`, and create new fishnets called `lcRasters_2011` and `lc_Rasters_2019` that have rows for each fishnet cell, and columns with 0/1 values for all of our land cover types.
+
+What this will allow us to do, in the end, is use land cover types as dummy variables in our model - in other words, we can make predictions of a cell's likelihood to develop based on a hypothesized association between a cell's land cover in `t1` (e.g. forest, wetlands etc.,) and it's developability.
+
+
+```{r, warning = FALSE, message = FALSE}
+lcRasters_2011 <-
+  aggregateRaster(rasterList_2011, 
+                  houstonMSA_fishnet) %>%
+  dplyr::select(developed_2011,
+                   forest_2011,
+                   farm_2011,
+                   wetlands_2011,
+                   otherUndeveloped_2011,
+                   water_2011) %>%
+  mutate_if(is.numeric,as.factor)
+
+lcRasters_2019 <-
+  aggregateRaster(rasterList_2019, 
+                  houstonMSA_fishnet) %>%
+  dplyr::select(developed_2019,
+                   forest_2019,
+                   farm_2019,
+                   wetlands_2019,
+                   otherUndeveloped_2019,
+                   water_2019) %>%
+  mutate_if(is.numeric,as.factor)
+
+```
+
+
+We can now plot the aggregated rasters in a facetted fashion and examine them.
+
+Which type of land cover status do you think would be good predictors of development? For example, it would be a reasonable hypothesis that wetlands - due to either their preservation status or their difficulty to excavate - would be associated with a low likelihood of development.
+
+```{r, message = FALSE, warning = FALSE}
+lcRasters_2011 %>%
+  st_centroid() %>%
+ gather(key = "variable", value = "value", developed_2011:water_2011) %>% 
+  mutate(X = xyC(.)$x,
+         Y = xyC(.)$y) %>%
+  ggplot() +
+    geom_sf(data=houstonMSA) +
+    geom_point(aes(X,Y, colour=as.factor(value))) +
+    facet_wrap(~variable) +
+    scale_colour_manual(values = palette2,
+                        labels=c("Other","Land Cover"),
+                        name = "") +
+    labs(title = "Land Cover Types, 2011",
+         subtitle = "As fishnet centroids") +
+   theme_void()
+```
+
+# 6. Wrangle Census Data and Join To the Fishnet
+
+Population density is obviously a critical demand-side component of predicting `Development_Demand`. Census data for both 2011 and 2019 can be downloaded quickly using the `tidycensus` package. As illustrated below, these data are downloaded at a census tract geography and thus, an approach is needed to reconcile tracts and fishnet geometries. This is accomplished using a technique called areal weighted interpolation.
+
+Keep in mind, when you are choosing your time period of interest for your study, that the ACS came into being in the mid 2000s - so models based on data further back might need to use decennial census data sets and different `tidycensus` API calls.
+
+One useful variable that we do not explore in this exercise is population change - it stands to reason that an undeveloped grid cell in or proximate to an area with accelerating growth (e.g. a density higher than that of 5 or 10 years previous) would be likely to convert.
+
+Recall, you will need a census API key to download the census data which must be input with `census_api_key`. 
+
+## 6.1. Downloading Census Data via API
+
+Load your census API key by pasting it into the code block below with the function `census_api_key`
+
+```{r load_key_hide, warning= FALSE, include=FALSE}
+census_key <- read.table("~/GitHub/census_key.txt", quote="\"", comment.char="")
+census_api_key(census_key[1] %>% as.character(), overwrite = TRUE)
+```
+
+```{r load_key, warning = FALSE, eval = FALSE}
+census_api_key("YOUR KEY GOES HERE", overwrite = TRUE)
+```
+
+First data we pull population data for `t1` and reproject it to the same crs as our study fishnet - `houstonMSA_fishnet`.
+
+In your growth model - you can pull more demographic and economic variables here by adding them to the `acs_vars` list of data that you'd like to call from the Census.
+
+Note that you need to specify your study area in the API call - here I specify the state as `48` (The two-letter abbreviation `TX` would also work), and I specify the county with a list of the counties in my study area.
+
+This is a nice dplyr chain that does the following:
+
+- DL the data, 
+- `select` only the Estimates, NAME, and GEOID column (e.g. removing the margin of error columns)
+- `rename` my variables to be intelligible, 
+- `st_transform` the data to the `houstonMSA_fishnet` crs
+- `st_buffer` the geometries a teeny tiny bit (by negative 1 map unit) - this is done because sometimes (only sometimes) you have twisted and broken geometries, and this fixes it. If you don't do this, when we do aerially weighted interpolation, you might get an error.
+
+```{r, warning = FALSE, message = FALSE, results = "hide"}
+# Specify which variable(s) you would like to grab. Here, only one (Total Population) is listed, but you could add more to the call.
+acs_vars <- c("B02001_001E")
+
+# Using "tract" as the geography and 2011 as the year, download data data for the Houston MSA counties listed.
+houstonPop11 <- get_acs(geography = "tract", 
+                        variables = acs_vars, 
+                        year = 2011,
+                        state = 48, 
+                        geometry = TRUE, 
+                        output = "wide",
+                        county=c("Harris COunty","San Jacinto","Montgomery","Liberty","Waller",
+                         "Austin","Chambers","Fort Bend","Brazoria","Galveston")) %>%
+                dplyr::select (GEOID, NAME, acs_vars) %>%
+                rename(pop_2011 = B02001_001E) %>%
+                st_transform(st_crs(houstonMSA_fishnet)) %>%
+                st_buffer(-1)
+```
+
+We do this once more for `t2`, in this case, 2019.
 
 
 ```{r, warning = FALSE, message = FALSE, results = "hide"}
@@ -1440,11 +701,700 @@ houstonPop19 <- get_acs(geography = "tract",
                         output = "wide",
                         county=c("Harris COunty","San Jacinto","Montgomery","Liberty","Waller",
                          "Austin","Chambers","Fort Bend","Brazoria","Galveston")) %>%
-                rename(pop2019 = B02001_001E) %>%
-                dplyr::select(-starts_with("B"))
+                dplyr::select (GEOID, NAME, acs_vars) %>%
+                rename(pop_2019 = B02001_001E) %>%
+                st_transform(st_crs(houstonMSA_fishnet)) %>%
+                st_buffer(-1)
+```
 
-# Make sure to transform to the crs of the fishnet!
-houstonPop19 <- houstonPop19 %>%
-  st_transform(st_crs(houstonMSA_fishnet))
+Then we can plot our data and see the spatial arrangement of population in our study area in t1 and t2.
+
+One thing worth noting here is that the quantile symbology that we apply probably changes from t1 to t2 - so you can see that, on average, there was densification across the metro area on this time interval - the quantile ranges shift upwards.
+
+<div class="superbigimage">
+```{r, warning = FALSE, message = FALSE, fig.height= 8, fig.width= 11}
+grid.arrange(
+ggplot() +
+  geom_sf(data = houstonPop11, aes(fill=factor(ntile(pop_2011,5))), colour=NA) +
+  scale_fill_manual(values = palette5,
+                    labels=quintileBreaks(houstonPop11,"pop_2011"),
+                   name="Quintile\nBreaks") +
+  labs(title="Population, Houston MSA: 2011") +
+  theme_void(),
+
+ggplot() +
+  geom_sf(data = houstonPop19, aes(fill=factor(ntile(pop_2019,5))), colour=NA) +
+  scale_fill_manual(values = palette5,
+                    labels=quintileBreaks(houstonPop19,"pop_2019"),
+                   name="Quintile\nBreaks") +
+  labs(title="Population, Houston MSA: 2019") +
+  theme_void(), ncol=2)
+```
+
+## 6.2. Aggregate Census Data with Aerially Weighted Interpolation
+
+AWI is a cool spatial analysis tool, you may not have used it before - we can use it to reconcile tract boundaries and fishnet grid cells, and apportion population from the tracts to the cells. Here is how Prof. Steif described AWI -
+
+*Areal weighted interpolation is a really strong spatial analysis skill to have. You can do this in ArcGIS but there is not automated approach.*
+
+*A spatial join would be inappropriate as it would assign the same population value from one tract to the many intersecting grid cells. Instead, the area weighted interpolation function ... assigns a proportion of a tract’s population to a grid cell weighted by the proportion of the tract that intersects the grid cell. This works best of course, when we assume that the tract population is uniformly distributed across the tract. This is typically not a great assumption. However, it is a reasonable one here particularly given population is a feature in a regression and not an outcome that needs to be measured with significant precision. *
+
+*Ken Steif, 2019*
+
+The code chunks below perform AWI for our `t1` and `t2` census data using the `st_interpolate_aw` function. This process might take a bit of time to run. The output is a new fishnet for each year that consists of a population estimate and a geometry. It is important to note that your tracts and your fishnet might have points where they fail to overlap, and you might lose the fidelity of your analysis by dropping fishnet cells. This workflow is 
+
+Here is a breakdown of the workflow so that you can adapt it to use other data sets in your analysis.
+
+- `st_interpolate_aw` takes an sf object (`houstonPop11`), a column name from that sf object (`["pop_2011"]`) and our fishnet `houstonMSA_fishnet`. Leave the argument `extensive=TRUE` as-is.
+
+- Knowing that our result might have a differing number of cells from the fishnet, we convert this object to centroids (`st_centroid`) and spatially join it to our fishnet using `st_join` - a join initiated from the `houstonMSA_fishnet` object. This finds the points where our AWI results intersect the fishnet cells, and keeps any cells where there is no intersection,
+
+- Lastly, we perform some data cleaning, where we replace NA values (`replace_na`) with zeros, and `select` only our `pop_2011` column to remain.
+
+Keep an eye on how many cells your fishnets have throughout the process - if you are adding or dropping cells, something is going wrong.
+
+If you get warning messages about "constant or uniform" geometries - this is just the `sf` package reminding you to be on your p's and q's about projections - it won't protect you if your projections don't match!
+
+```{r, warning = FALSE, message = FALSE}
+fishnetPopulation11 <-
+  st_interpolate_aw(houstonPop11["pop_2011"], 
+                    houstonMSA_fishnet, 
+                    extensive=TRUE) %>%
+  st_centroid() %>%
+  st_join(houstonMSA_fishnet, ., join = st_intersects) %>%
+  mutate(pop_2011 = replace_na(pop_2011,0)) %>%
+  dplyr::select(pop_2011)
+```
+
+We repeat the process for our `t2` data.
+
+
+```{r}
+fishnetPopulation19 <-
+  st_interpolate_aw(houstonPop19["pop_2019"],
+                    houstonMSA_fishnet, 
+                    extensive=TRUE) %>%
+  st_centroid() %>%
+  st_join(houstonMSA_fishnet, ., join = st_intersects) %>%
+  mutate(pop_2019 = replace_na(pop_2019,0)) %>%
+  dplyr::select(pop_2019)
+```
+
+How do these data look when we map them out and compare them to the census vectors? We can see that the modifiable aerial unit issue - where smaller tracts are higher density because of the logic of tract-drawing - no longer distorts the picture - we see increased density in the center, where we expect it.
+
+<div class="superbigimage">
+```{r, warning = FALSE, message = FALSE, fig.height = 8, fig.width= 11}
+grid.arrange(
+ggplot() +
+  geom_sf(data=houstonPop11, aes(fill=factor(ntile(pop_2011,5))),colour=NA) +
+  scale_fill_manual(values = palette5,
+                    labels=substr(quintileBreaks(houstonPop11,"pop_2011"),1,4),
+                   name="Quintile\nBreaks") +
+  labs(title="Population, Houston MSA: 2011",
+       subtitle="Represented as tracts; Boundaries omitted") +
+  theme_void(),
+
+  ggplot() +
+  geom_sf(data=fishnetPopulation11, 
+         aes(fill=factor(ntile(pop_2011,5))),colour=NA) +
+  scale_fill_manual(values = palette5,
+                   labels=substr(quintileBreaks(fishnetPopulation11,"pop_2011"),1,4),
+                   name="Quintile\nBreaks") +
+  labs(title="Population, Houston MSA: 2011",
+       subtitle="Represented as fishnet gridcells; Boundaries omitted") +
+  theme_void(), ncol=2)
+```
+</div>
+
+# 7. Transportation And Infrastructure
+
+Accessibility is a key determinant of development potential. The hypothesis here is that the closer a cell is to highway infrastructure, the more likely it is to develop. Accessibility features are engineered by measuring distance from each grid cell to its nearest highway. 
+
+This example only uses highway distance, but one could easily add spatial information about transit lines, bus networks or other relevant infrastructure as predictors. In urban growth modeling, one might model scenarios where new infrastructure is developed, such as a new highway or a new transit line.
+
+To manipulate this workflow and include new infrastructure, you can use ArcGIS or other software to draw a new highway, and then bring that shape into a modeling workflow in this section and calculate new (hypothetical) distance-to-highway variables for each cell in `t2` to use as a basis for forecasting an alternate future `t3` where some cells now have a different level of access to transportation.
+
+## 7.1. Download Highways
+
+First highway vectors (`primary_roads`) are downloaded from the `Tigris` package - we project the data and subset it to the study area using `st_intersection`.
+
+```{r, warning = FALSE, message = FALSE, results = "hide"}
+houstonHighways <-
+  tigris::primary_secondary_roads(state = "TX") %>%
+  st_transform(st_crs(houstonMSA)) %>%
+  st_intersection(houstonMSA) %>%
+  st_transform(st_crs(fishnet))
+```
+
+Let's make a map and examine the spatial relationship between highways and development.
+
+```{r plot_highway, warning = FALSE, message= FALSE}
+ggplot() +
+  geom_point(data=fishnet, 
+             aes(x=xyC(fishnet)[,1], y=xyC(fishnet)[,2],colour=development_change),size=1.5) +
+  geom_sf(data=houstonHighways) +
+  scale_colour_manual(values = palette2,
+                      labels=c("No Change","New Development")) +
+  labs(title = "New Development and Highways",
+       subtitle = "As fishnet centroids") +
+  theme_void()
+```
+
+## 7.2. Calcuate Distance to Highways
+
+We can create a new fishnet variable called `distance_highways_2011` by turning our `houstonMSA_fishnet` into centroid points and calculating the distance from each cell centroid to the nearest highway segment. This is done in a `mutate` command that utilizes the `st_distance` function to run this distance calculation for each observation.
+
+We join these observations back to a fishnet, and the result is a grid called `highwayPoints_fishnet` with a column called `distance_highways_2011`.
+
+An important note:
+
+This analysis operates on the *assumption* that the transporation network in `t2` (2019) is the same as in `t1` - so we create a fishnet representing `t2` that is the same - we merely copy it.
+
+*If you are trying to input a different set of transportation infrastructure as the basis for your future projection for t3 - you will want to import this new network info at this step and create an alternative `highwayPoints_fishnet_2019` (or whatever name represents t2 in your analysis). This information will be an important variable in your model that you use to project future development change.*
+
+```{r, warning = FALSE, message = FALSE}
+highwayPoints_fishnet_2011 <- houstonMSA_fishnet %>%
+  st_centroid() %>%
+  mutate(distance_highways_2011 = as.numeric(st_distance(., st_union(houstonHighways) %>% 
+                                                      st_transform(st_crs(houstonMSA_fishnet))))) %>%
+  as.data.frame() %>% 
+  dplyr::select(-geometry) %>% 
+  left_join(houstonMSA_fishnet, .) %>% 
+  st_as_sf()
+
+highwayPoints_fishnet_2019 <- highwayPoints_fishnet_2011 %>%
+  rename(distance_highways_2019 = distance_highways_2011)
 
 ```
+
+```{r, warning = FALSE, message = FALSE}
+
+ggplot() +
+  geom_sf(data=houstonMSA %>% st_transform(st_crs(highwayPoints_fishnet_2011))) +
+  geom_point(data=highwayPoints_fishnet_2011, aes(x=xyC(highwayPoints_fishnet_2011)[,1], 
+                                             y=xyC(highwayPoints_fishnet_2011)[,2], 
+                 colour=factor(ntile(distance_highways_2011,5))),size=1.5) +
+  scale_colour_manual(values = palette5,
+                      labels=substr(quintileBreaks(highwayPoints_fishnet_2011,"distance_highways_2011"),1,8),
+                      name="Quintile\nBreaks") +
+  geom_sf(data=houstonHighways, colour = "red") +
+  labs(title = "Distance to Highways (m)",
+       subtitle = "As fishnet centroids; Highways visualized in red") +
+  theme_void()
+```
+
+# 8. Calculate spatial lag of development
+
+As we read in Prof. Steif's introductory essay, the core of our modelling approach is the harnassing of spatial endogenaeity - we hypothesize that the likelihood of a cell to develop is (in part) a function of its proximity to existing development. How do we "parameterize" the adjacency or access of each cell relative to existing development? We use "spatial lag" variables like k-nearest-neighbors (knn).
+
+In this example, we calculate the average distance to each grid cell's 2 nearest developed grid cells in year `t1`. We do this using a custom function that we loaded earlier called `nn_function` to create new variables in our `fishnet` grid for `lagDevelopment_2011` and `lagDevelopment_2019`. 
+
+The `nn_function` takes three arguments - two data frames with lists of x-y coordinates, and a k.
+
+- The first parameter specifies an sf object whose coordinates we want to `measureFrom`, in this case, all `fishnet` centroids. Since the function requires a data frame with x-y coordinates, we take our fishnet, convert it to centroids (`st_centroid`), extract the coordinates to a new data frame (`st_coordinates`, `as.data.frame()`)
+
+- The second, indicates the sf point data we wish to `measureTo`, in this case, the fishnet centroids that were developed in `t1`. We `filter` our `lcRasters_2011` to include only our developed cells, and then we follow the steps we took for our fishnet data, converting to centroid, and extracting coordinates to a new data frame.
+
+- The last parameter is our k - how many neighbors to which we'd like to measure average distance. Why `k=2`? As `k` fluctuates, so does the hypothesized scale of accessibility. One can test the effect of different k parameters on model goodness of fit. A more sophisticated model would hypothesize that this scale can vary significantly from city to suburb to rural town.
+
+```{r, warning = FALSE, message = FALSE}
+fishnet$lagDevelopment_2011 <-
+    nn_function(fishnet %>%
+                  st_centroid() %>%
+                  st_coordinates() %>%
+                  as.data.frame(),
+                lcRasters_2011 %>%
+                  filter(developed_2011 == 1) %>%
+                  st_centroid() %>%
+                  st_coordinates() %>%
+                  as.data.frame(),
+                2)
+
+fishnet$lagDevelopment_2019 <-
+    nn_function(fishnet %>%
+                  st_centroid() %>%
+                  st_coordinates() %>%
+                  as.data.frame(),
+                lcRasters_2019 %>%
+                  filter(developed_2019 == 1) %>%
+                  st_centroid() %>%
+                  st_coordinates() %>%
+                  as.data.frame(),
+                2)
+```
+
+```{r, warning = FALSE, message = FALSE}
+ggplot() +
+  geom_sf(data=houstonMSA %>% st_transform(st_crs(fishnet))) +
+  geom_point(data=fishnet, 
+             aes(x=xyC(fishnet)[,1], y=xyC(fishnet)[,2], 
+                 colour=factor(ntile(lagDevelopment_2011,5))), size=1.5) +
+  scale_colour_manual(values = palette5,
+                     labels=substr(quintileBreaks(fishnet,"lagDevelopment_2011"),1,7),
+                     name="Quintile\nBreaks") +
+  labs(title = "Spatial Lag to 2011 Development, m",
+       subtitle = "As fishnet centroids") +
+  theme_void()
+```
+
+
+# 9. Political Boundaries
+
+We are going to add information about county boundaries to our data set. This serves two important purposes. First, it might be useful to include municipality as a fixed effect in your models to add information about regulatory "culture" or desirability of different areas. Using a geographic fixed effect adds the "average effect" of a particular area on the dependent variable - commonly this is used as a variable in housing price models to incorporate place-based price signals from things like school district or neighborhood reputation. Second, we can use this information to evaluate and analyze our model outputs - seeing where development is expected to take place and evaluate our errors across space.
+
+We can get data on counties from the US Census Bureau via the `tigris` package, transform it to the CRS of our study area, and then `filter` our county data to contain only the relevant shapes for our study area.
+
+```{r, warning = FALSE, message = FALSE, results = "hide"}
+options(tigris_class = "sf")
+
+counties <- counties(state = "TX") %>%
+  st_as_sf() %>%
+  st_transform(st_crs(houstonMSA_fishnet))
+
+studyAreaCounties <- counties %>%
+  filter(NAME %in% c("Harris","San Jacinto","Montgomery","Liberty","Waller",
+                         "Austin","Chambers","Fort Bend","Brazoria","Galveston"))
+
+```
+
+We can spatially join the `studyAreaCounties` object to our fishnet and create a `countyFishnet` where each cell is imparted with the name of the county it belongs to.
+
+```{r}
+countyFishnet <- houstonMSA_fishnet %>%
+  st_join(., studyAreaCounties %>%
+            dplyr::select(NAME)) %>%
+  as.data.frame() %>% 
+  dplyr::select(uniqueID, NAME) %>% 
+  left_join(houstonMSA_fishnet, .) %>% 
+  st_as_sf() %>%
+  group_by(uniqueID) %>%
+  slice(1) %>%
+  ungroup() %>%
+  arrange(as.numeric(uniqueID))
+  
+```
+
+# 10. Creating Our Data Set for Modeling
+
+We've done a substantial amount of data wrangling and transformation, and now we can put all of our fishnets together into a data set that we can explore (as part of our feature engineering) and ultimately model. We will need to prepare data sets for `t1` (used to train a model that can predict `development_change` between `t1` and `t2`), and for `t2` (which uses the same variables to forecast change in `t3`).
+
+If there are additional elements that you want to add to your modeling, this is the step where you can put them together. If you are doing your data wrangling using ArcGIS, this is a point at which you'd want to bring your data in to create data sets that are similar to those we create below:
+
+Let's take stock of what we have:
+
+For t1
+
+- fishnet
+- highwayPoints_fishnet_2011
+- fishnetPopulation11
+- lcRasters_2011
+- countyFishnet
+
+For t2
+
+- fishnet
+- highwayPoints_fishnet_2011
+- fishnetPopulation11
+- lcRasters_2011
+- countyFishnet
+
+Each of these fishnets should have the same number of cells (in this analysis, that's 32816), and given that they were created in the same manner, they will be indexed identically, and can be appended to one another using `cbind`.  Using `select`, we keep only our relevant independent variables (lc type, transport distance, county name, lag to development etc.,), our dependent variable (development change), our uniqueID and our geometry.
+
+In the last two step of our data binding process below we use a function called `rename_with` to remove the string indicating the year from our column names. Why do we do this? It's because our trained model (built using `t1` data) will columns of the same name and data type for `t2` to make predictions. The training data is all it "knows" - so we must prepare similarly formatted data to deploy it.
+
+```{r}
+
+
+dat_2011 <- 
+  cbind( fishnet, highwayPoints_fishnet_2011, fishnetPopulation11, lcRasters_2011, countyFishnet) %>%
+  as.data.frame() %>%
+  dplyr::select(uniqueID, development_change, lagDevelopment_2011, distance_highways_2011, pop_2011,  
+                developed_2011, forest_2011, farm_2011, wetlands_2011, otherUndeveloped_2011, water_2011,
+                NAME, geometry) %>%
+  filter(water_2011 == 0) %>%
+  rename_with(~ str_remove(.x, "_2011"))
+
+dat_2019 <- 
+  cbind( fishnet, highwayPoints_fishnet_2019, fishnetPopulation19, lcRasters_2019, countyFishnet) %>%
+  as.data.frame() %>%
+  dplyr::select(uniqueID, development_change, lagDevelopment_2019, distance_highways_2019, pop_2019,  
+                developed_2019, forest_2019, farm_2019, wetlands_2019, otherUndeveloped_2019, water_2019,
+                NAME, geometry) %>%
+  filter(water_2019 == 0)  %>%
+  rename_with(~ str_remove(.x, "_2019"))
+  
+
+```
+
+# 11. Feature Exploration
+
+In this section we explore the extent to our possible predictors are associated with development change. If the goal was to predict a continuous variable, scatterplots and correlation coefficients make this process straightforward and relatively easy to explain to a non-technical decison maker.
+
+In this case however, the dependent variable is a binary outcome - either a grid cell was developed between `t1` and `t2` or it wasn’t. In this case, the relevant question is whether for a given feature, there is a notable significant difference in its central tendancies or distribution between areas that changed and areas that did not. These differences are explored in a set of plots below. For models with lots of features, these plots could be complimented by a series of statistical tests examining the difference between a predictor's mean for `1` and `0` cases.
+
+Here, we `select` our continuous varialbes and our dependent variable, convert our to long form using `gather` created facetted bar plots. Note that `geom_bar` calculates the `mean` has a `fun.y` argument where we can calculate the mean value for these variables inside our plotting function. 
+
+How do you interpret each of these plots? Try the following framework - "On average, a cell that converted from undeveloped to developed had was __________ compared to a cell that didn't convert."
+
+Do you think these are going to be good predictors of `development_change`? Why?
+
+```{r, warning = FALSE, message = FALSE}
+dat_2011 %>%
+  dplyr::select(distance_highways,lagDevelopment,development_change, pop) %>%
+  gather(Variable, Value, -development_change) %>%
+  ggplot(., aes(development_change, Value, fill=development_change)) + 
+    geom_bar(position = "dodge", stat = "summary", fun.y = "mean") +
+    facet_wrap(~Variable, scales = "free") +
+    scale_fill_manual(values = palette2,
+                      labels=c("No Change","New Development"),
+                      name="Mean Value") +
+    labs(title="New Development as a Function of Continuous Variables") +
+    theme_minimal() 
+```
+
+It's also useful to look at the patterns of change between different land cover types. What proportion of each undeveloped land cover type converted to developed during the t1-t2 interval?
+
+
+```{r, warning = FALSE, message = FALSE}
+dat_2011 %>%
+  dplyr::select(development_change, forest, farm, wetlands, otherUndeveloped) %>%
+  gather(key = "Land_Cover_Type", Value, -development_change) %>%
+     group_by(development_change, Land_Cover_Type) %>%
+     summarize(n = sum(as.numeric(Value))) %>%
+     ungroup() %>%
+    mutate(Conversion_Rate = paste0(round(100 * n/sum(n), 2), "%")) %>%
+    filter(development_change == 1) %>%
+  dplyr::select(Land_Cover_Type,Conversion_Rate) %>%
+  kable() %>% kable_styling(full_width = F)
+```
+
+# 12. Modeling
+
+We are going to train and test our models using a workflow based on the one we learned in the ["Introduction to Applied Predictive Modeling" text](https://mafichman.github.io/applied_predictive_modeling/#1_Introduction), where we used Binary Logistic Regression to estimate morbidity in plants.
+
+## 12.1. Splitting our data
+
+First, `dat` is split into 50% training and test sets. Since we have relatively few 1's in our data, a generous train/test split helps keeps a fair number of 1's in the training set. Note how we specify `dat_2011$otherUndeveloped` as needing to be sorted into our training set - there are relatively few of these, and we want to make sure our model has "seen" all levels of our fixed effects in training.
+
+```{r, warning = FALSE, message = FALSE}
+set.seed(3456)
+trainIndex <- 
+  createDataPartition(dat_2011$otherUndeveloped, p = .50,
+                                  list = FALSE,
+                                  times = 1)
+datTrain <- dat_2011[ trainIndex,]
+datTest  <- dat_2011[-trainIndex,]
+
+```
+
+## 12.2. Specifying models
+
+We estimate six separate `glm` models - adding new variables for each.
+
+- `Model1` includes only previous land cover types. 
+
+- `Model2` adds the `lagDevelopment`. 
+
+- `Model3` adds population
+
+- `Model4` adds a fixed effect for county (`NAME`)
+
+- `Model5` adds the distance to highway.
+
+- `Model6` is a modification of `Model5` which *interacts* distance to highway and development lag. The hypothesis here is that these two variables are related - the effect of one depends on the other. e.g. Distance to nearest development depends in part on access to transportation. Notice that the effect of both variables is significant in this specification, but both are not significant in `Model5`.
+
+Which model is best? The one that performs the most usefully in our forecasting use case! As it turns out, although county is not significant in our models, it proves useful when we examine our outcomes.
+
+```{r, warning = FALSE, message = FALSE}
+Model1 <- glm(development_change ~ wetlands + forest  + farm + 
+                otherUndeveloped, 
+              family="binomial"(link="logit"), data = datTrain)
+
+Model2 <- glm(development_change ~ wetlands + forest  + farm + 
+                otherUndeveloped + lagDevelopment, 
+              family="binomial"(link="logit"), data = datTrain)
+              
+Model3 <- glm(development_change ~ wetlands + forest  + farm +
+                otherUndeveloped + lagDevelopment + pop,
+              family="binomial"(link="logit"), data = datTrain)          
+              
+Model4 <- glm(development_change ~ wetlands + forest  + farm + 
+                otherUndeveloped + lagDevelopment + pop + NAME, 
+              family="binomial"(link="logit"), data = datTrain) 
+
+Model5 <- glm(development_change ~ wetlands + forest  + farm + 
+                otherUndeveloped + lagDevelopment + pop + distance_highways + NAME, 
+              family="binomial"(link="logit"), data = datTrain) 
+
+Model6 <- glm(development_change ~ wetlands + forest  + farm + 
+                otherUndeveloped + pop + lagDevelopment * distance_highways + NAME, 
+              family="binomial"(link="logit"), data = datTrain) 
+```
+
+
+Print the summary objects for your models, and choose one to use as your model for the validation and prediction procedure to follow.
+
+
+```{r}
+
+summary(Model6)
+
+```
+You can compare the AIC indicators for the models to get a sense of their general capacity to explain variation in your dependent variable. The lower the AIC, the better the goodness of fit - remember, this is NOT the same as model "quality" when it comes to prediction!
+
+```{r}
+data.frame(
+  Model = c("Model1", "Model2", "Model3", "Model4", "Model5", "Model6"),
+  AIC = c(Model1$aic, Model2$aic, Model3$aic, Model4$aic, Model5$aic, Model6$aic)
+) %>%
+  ggplot()+
+  geom_bar(aes(x = Model, y = AIC), stat = "identity")+
+  theme_minimal()
+
+```
+
+## 12.3. Validating our Model Using the Test Set
+
+We create a new data frame `testSetProbs` that consists of our `class` (e.g. development_change as a 1 or 0), and `probs` - which is the prediction for each observation in our test set using `Model6`. The `type` parameter is set to `response`, which means our `probs` are measures of estimated probability from 0-1.
+
+```{r, warning = FALSE, message = FALSE}
+testSetProbs <- 
+  data.frame(class = datTest$development_change,
+             probs = predict(Model6, datTest, type="response")) 
+```
+
+This density plot is a key tool to figure out where we will set our threshold for classifying predicted probabilities as 1's or 0's (eg Predicted to Develop or Predicted Not To Develop).
+
+Take a close look at this plot and see if you have some ideas about what threshold would separate out our 1's from our 0's most effectively with a minimum of error.
+
+```{r}  
+ggplot(testSetProbs, aes(probs)) +
+  geom_density(aes(fill=class), alpha=0.5) +
+  scale_fill_manual(values = palette2,
+                    labels=c("No Change","New Development")) +
+  labs(title = "Histogram of test set predicted probabilities",
+       x="Predicted Probabilities",y="Density") +
+  theme_minimal()
+```
+
+
+### 12.3.1. Confusion matrix
+
+Let's say that 0.05 is a good cutoff value - above that value, we predict that cell is a `1`, and below it, a `0`.
+
+Let's build a confusion matrix to see how accurate this model is overall, and what our error rates are.
+
+It helps to write out in plain language what our four outcomes are:
+
+- True Positive: We predicted a cell would convert from undeveloped to developed and it *did* convert.
+
+- False Positive: We predicted a cell would convert from undeveloped to developed and it *did not* convert.
+
+- True Negative: We predicted a cell would *not* convert from undeveloped to developed and it *did not* convert.
+
+- False Negative: We predicted a cell would *not* convert from undeveloped to developed and it *did* convert.
+
+If you want to adjust model performance, or use a different model, you can change the model type in the previous step and/or change the threshold in this step (see the first line of code) and compare the performance.
+
+```{r}
+testSetProbs$predClass  = ifelse(testSetProbs$probs > .05 ,1,0)
+
+caret::confusionMatrix(reference = as.factor(testSetProbs$class), 
+                       data = as.factor(testSetProbs$predClass), 
+                       positive = "1")
+
+```
+
+### 12.3.2. ROC Curve
+
+One more indicator of model performance - the ROC curve. Do we have a "healthy" looking curve? Above the y=x line, not a "hard elbow" shape, and relatively convex?
+
+In this case, we certainly do.
+
+```{r roc_curve, message = FALSE, warning = FALSE}
+
+ggplot(testSetProbs, aes(d = as.numeric(class), m = probs)) + 
+  geom_roc(n.cuts = 50, labels = FALSE) + 
+  style_roc(theme = theme_grey) +
+  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
+  theme_minimal()
+```
+
+## 12.4. Analyzing Error
+
+Now that we have our model, we want to assess our errors across our entire *t2* data set for a few different thresholds and do some "generalizability" tests. 
+
+We should think critically about model thresholds. What does a planner want to optimize for in this situation? Are we mainly concerned with correctly predicting development (True Positives)? What if that means we erroneously predict some areas that *did change* as *no change* (False Negatives)? 
+
+Let's say, for our purposes, that we want to be generous about predicting change, so we have a more general spatial understanding of where change *might* take place, and not accidentally overlook an area where we miss the trend because we were too conservative. You are welcome to take a different approach to this question when you do such a model for yourself - this is a context-dependent choice.
+
+### 12.4.1. Setting a Threshold
+
+Let's compare two different thresholds - 5% and 17%. In plain English, this means that if a predicted probability is greater than 0.05, under the 5% regime, we say "this is classified as a 1".  At a 5% threshold we correctly predict a higher rate of new development areas (True Positive Rate), but incorrectly predicts more no change areas (True Negative Rate).  Conversely, the 17% threshold has a lower True Positive rate and but a far higher True Negative rate. Because most of our cells do not change from *t1* to *t2*, this leads to higher accuracy.
+
+What you think is better here as a threshold? This is a matter of your expertise.
+
+The mechanics of the code below are as follows. 
+
+- We create a new sf object called `dat_2011_preds` starting with `dat_2011` (our whole `t2` data set). 
+
+- We pipe in a mutate command, where we first use the `predict` function to generate probability estimates for each row in `dat_2011` using our model of choice, `Model6`. These estimates are stored in a column called `probs`.
+
+- In a second `mutate` command, we create two new columns classifying our predictions based on `ifelse` statements. e.g. "If `probs` is greater or equal to 0.05, set `Threshold_5_Pct` equal to 1, else set it equal to 0"
+
+- We subsequently use mutate statements to create columns that reflect the accuracy of these classifications using `case_when` statements - which is basically an elaborate `ifelse` statement based on a bunch of conditions - e.g. "If the `Threshold_5_Pct` is a 1, and `development_change` (e.g. the observed), set `confResult_05` to "True_Negative", etc.,
+
+```{r, warning = FALSE, message = FALSE}
+dat_2011_preds <-         
+  dat_2011 %>%
+    mutate(probs = predict(Model6, dat_2011, type="response")) %>%
+   mutate(Threshold_5_Pct = as.factor(ifelse(probs >= 0.05 ,1,0)),
+           Threshold_17_Pct =  as.factor(ifelse(probs >= 0.17 ,1,0))) %>%
+  mutate(confResult_05 =case_when(Threshold_5_Pct == 0 & development_change == 0 ~ "True_Negative",
+                              Threshold_5_Pct == 1 & development_change==1 ~ "True_Positive",
+                              Threshold_5_Pct == 0 & development_change==1 ~ "False_Negative",
+                              Threshold_5_Pct == 1 & development_change ==0 ~ "False_Positive")) %>%
+  mutate(confResult_17 =case_when(Threshold_17_Pct == 0 & development_change == 0 ~ "True_Negative",
+                              Threshold_17_Pct == 1 & development_change==1 ~ "True_Positive",
+                              Threshold_17_Pct == 0 & development_change==1 ~ "False_Negative",
+                              Threshold_17_Pct == 1 & development_change ==0 ~ "False_Positive")) %>%
+  st_as_sf()
+```
+
+Now we can summarize our results by threshold *and* by any other category in our data to see how these thresholds affect our errors.
+
+Let's cross-tabulate our errors by threshold and by County. Do we think there are combinations of county and threshold that are sub-optimal?
+
+```{r}
+
+# Summarize by county and model type
+dat_2011_preds %>%
+  as.data.frame() %>%
+  dplyr::select(confResult_05, confResult_17, NAME) %>%
+  pivot_longer(cols = starts_with("confResult"), names_to = "Model_Type", values_to = "Confusion_Result") %>%
+  group_by(NAME, Model_Type, Confusion_Result) %>%
+  tally() %>%
+  pivot_wider(names_from = Confusion_Result, values_from = n, values_fill = 0) %>% # Reshape to wide format
+  mutate(TN_Rate_Specificity = 100*( True_Negative/(True_Negative+False_Positive)),
+         TP_Rate_Sensitivity = 100*( True_Positive/(True_Positive + False_Negative))) %>%
+  dplyr::select(NAME, Model_Type, TN_Rate_Specificity, TP_Rate_Sensitivity) %>%
+  kable() %>%
+  kable_styling()
+
+
+
+```
+
+We can also map our errors and see how our threshold choices manifest themselves across space in our study area.
+
+Notice how the spatial pattern of True Positives for both thresholds is relatively consistent, but the 5% threshold misses most the study area with respect to True Negatives.
+
+<div class="superbigimage">
+```{r, warning = FALSE, message= FALSE, fig.height = 6, fig.width= 8}
+ggplot() +
+  geom_sf(data= dat_2011_preds %>%
+            st_centroid() %>%
+               dplyr::select(confResult_05, confResult_17, geometry) %>%
+               gather(key = "Variable", value = "Value", -geometry), 
+             aes(colour=Value)) +
+  facet_wrap(~Variable) +
+  scale_colour_manual(values = c("red", "yellow", "blue", "grey"), labels=c("False Negative","False Positive", "True Negative", "True Positive"),
+                      name="") +
+  labs(title="Development Predictions - By Threshold") + 
+  theme_void()
+```
+</div>
+
+
+# 13. Making A Forecast
+
+OK, we are ready to use our model to forecast future development. Let's use our model `Model6` with a threshold of 0.17 - this will allow us to make a forecast that isn't quite as conservative and minimizes false negatives.
+
+Let's create an sf object called `dat_2027_preds` by feeding our `t2` data to `Model6`.
+
+*To create a forecast that incorporates new transportation infrastructure - your dat_2019 should have distance to transportation that was calculated using a shape that has a new highway as part of its geometry.*
+
+```{r}
+dat_2027_preds <- dat_2019 %>%
+    mutate(probs = predict(Model6, dat_2019, type="response") ,
+           Prediction = as.factor(ifelse(probs >= 0.17 ,1,0))) %>%
+  st_as_sf()
+  
+
+```
+
+
+Now lets map it - where are the cells that are classified as likely to develop by 2027?
+
+
+```{r, warning = FALSE, message = FALSE, fig.height= 8, fig.width= 8 }
+ggplot(data=dat_2027_preds) +
+  geom_point(aes(x=xyC(dat_2027_preds)[,1], 
+                 y=xyC(dat_2027_preds)[,2], colour = Prediction)) +
+  geom_sf(data = studyAreaCounties, fill = "transparent")+
+  labs(title="Development Predictions, 2027") + 
+  theme_void()
+```
+
+# 14. Assess Impact
+
+Once we have a forecast, it's the planner's job to think about how to react to the likely impacts of this anticipated demand with a strategy for allocating development through the use of planning - incentives, regulations etc.,
+
+There is a lot of exploratory analysis you might want to do with your model outputs. For example, you could use the `mapview` package to make a quick interactive map and explore communities in your study area in more detail. You can spatially cross-reference your prediction with data found in supplementary data sets, like parks, parcels and other land use data.
+
+## 14.1. Impact Assessment
+
+How much land is anticipated to convert by 2027? How much in total? How much by county? How much sensitive land is expected to convert?
+
+Overall land forecasted land conversion can be converted from cells to raw area by multiplying by the cell resolution - `res(lc_2019_rs)[1]`
+
+```{r}
+dat_2027_preds %>%
+  as.data.frame() %>%
+  summarize(total_cells = sum(as.numeric(Prediction))) %>%
+  mutate(total_area_m = total_cells * res(lc_2019_rs)[1],
+         total_km2 = total_area_m/1000000,
+         total_mi2 = total_km2*0.386102) %>%
+  kable() %>%
+  kable_styling ()
+
+```
+
+County-by-county forecast:
+
+```{r}
+dat_2027_preds %>%
+  as.data.frame() %>%
+  group_by(NAME) %>%
+  summarize(total_cells = sum(as.numeric(Prediction))) %>%
+  mutate(total_area_m = total_cells * res(lc_2019_rs)[1],
+         total_km2 = total_area_m/1000000,
+         total_mi2 = total_km2*0.386102) %>%
+  kable() %>%
+  kable_styling ()
+
+```
+
+Forecast by `t2` land cover type:
+
+```{r}
+dat_2027_preds %>%
+  as.data.frame() %>%
+  filter(Prediction == 1) %>%
+  dplyr::select(farm, otherUndeveloped, forest, wetlands, NAME) %>%
+  gather(-NAME, key = "Variable", value = "Value") %>%
+  group_by(NAME, Variable) %>%
+  summarize(total_cells = sum(as.numeric(Value))) %>%
+  mutate(total_area_m = total_cells * res(lc_2019_rs)[1],
+         total_km2 = total_area_m/1000000,
+         total_mi2 = total_km2*0.386102) %>%
+  kable() %>%
+  kable_styling ()
+
+```
+
+# 15. Next Steps - Towards an Allocation Strategy
+
+What do you do after you have a geographically specific forecast of likely development? You can integrate it with population projection information to see if forecasted growth areas seem adequate to accommodate future growth. You can dive in on areas where sensitive lands are at risk and determine if upzoning in other areas of nearby development might accommodate that population. You can compare future scenarios for fragmentation effects. There are myriad possibilities.
+
+

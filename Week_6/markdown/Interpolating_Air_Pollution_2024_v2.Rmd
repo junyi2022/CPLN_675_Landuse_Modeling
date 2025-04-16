@@ -1,7 +1,7 @@
 ---
-title: "CPLN 675: Interpolating Air Pollution Dynamics with Interpolation and Regression"
+title: "CPLN 6750: Interpolating Air Pollution Dynamics with Interpolation and Regression"
 author: "Michael Fichman"
-date: "2/28/2024"
+date: "2/20/2025"
 output:
   html_document:
     toc: true
@@ -17,23 +17,25 @@ library(knitr)
 ```
 
 
-***This markdown is based on material created cooperatively with the late Prof. Ken Steif.***
+*This markdown is based on material created cooperatively with the late Prof. Ken Steif.*
 
 # 1. Introduction
 
 Weather, air pollution and elevation are typically represented as continuous spatial processes. However, they are often derived from discrete sample points like weather stations, air quality sensors and GPS units and *interpolated* into surfaces. This module teaches students how convert discrete samples of ozone to continuous spatial estimated ‘surfaces’. It also introduces regression-based geospatial predictive modeling.
 
-The first part of the module contains instructions on how to conduct interpolation using kriging and inverse distance weighting procedures in ArcGIS and to calculate spatial lags.
+The first part of the module contains instructions on how to conduct interpolation using **kriging** and **inverse distance weighting** procedures in ArcGIS and to calculate spatial lags.
 
-The second part of the module involves running a regression model in R to estimate ozone levels.
+The second part of the module involves running an **OLS regression** model in R to estimate ozone levels.
+
+Our regression analysis is designed to predict local ozone as a function of independent predictors about our study area (like highway density and population density) and spatial variables (like nearby ozone measurements).  We can compare the accuracy of this method to our spatial interpolations.
 
 ## 1.2. Learning Objectives
 
 - Understand the idea of spatial interpolation. Compare and contrast methodological approaches.
 
-- Use the "fishnet" as a vector alternative to raster GIS.
+- Use the "fishnet" as a vector alternative to raster GIS operations.
 
-- Introduction to geospatial predictive modeling: run some linear models and see how they work mechanically when used for prediction.
+- Run a predictive model using spatial variables: run some linear models and see how they work mechanically when used for prediction.
 
 # 2. Data
 
@@ -125,29 +127,13 @@ We'll bring these data into R and explore them prior to creating a regression mo
 
 ## 4.1 Setup and Load Data
 
-Let’s start by loading the requisite libraries and creating a `mapTheme`, reading the epa shapefile and plotting it using the native sf plotting function. Note that if you are new to the sf package you should go run-through this tutorial.
+Let’s start by loading some libraries, and reading the epa shapefile and plotting it using the native sf plotting function. Note that if you are new to the sf package you should go run-through this tutorial.
 
 ```{r libraries, message = FALSE, warning = FALSE}
 library(tidyverse)
 library(sf)
 library(gridExtra)
 library(viridis)
-```
-
-```{r mapTheme, echo=TRUE}
-mapTheme <- theme(
-    text = element_text( color = "black"),
-    plot.title = element_text(size = 14,colour = "black"),
-    plot.subtitle=element_text(face="italic"),
-    plot.caption=element_text(hjust=0),
-    axis.ticks = element_blank(),
-    panel.background = element_blank(),axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=2)
-  ) 
 ```
 
 You can read in data in one of the following ways:
@@ -177,10 +163,14 @@ ggplot() +
   geom_sf(data=epa , aes(fill=ozoneHigh)) + 
   scale_fill_viridis() +
   labs(title="Ozone concentration by grid cell, Mid-Atlantic region") +
-  mapTheme
+  theme_void()
 ```
 
-This map is strange. It’s representing grid cells for which there is no air quality sensor as having ozone of 0.000. That’s not quite correct, however. What is the next map doing differently? Can you create this map on your own by creating two geom_sf objects? One should be just black, and a second on top that only shows our training cells.
+This map is strange. It’s representing grid cells for which there is no air quality sensor as having ozone of 0.000. That’s not quite correct, however.* What is the next map doing differently?* 
+
+Can you create this map you see below on your own by creating two `geom_sf` objects? 
+
+One should be just be a black shape, and a second on top should only contain our training cells.
 
 ```{r echo=FALSE}
 ggplot() +
@@ -189,7 +179,7 @@ ggplot() +
           aes(fill=ozoneHigh)) + 
   scale_fill_viridis() +
   labs(title="Ozone concentration by grid cell, Mid-Atlantic region") +
-  mapTheme
+  theme_void()
 ```
 
 # 5 Interpolating with regression
@@ -202,7 +192,7 @@ Feel free to run this code line by line to get a better sense of how it works.
 
 - We create a new sf object called `epa2` by piping `epa` to a series of dplyr commands.
 
-- We use the `st_centroid` and `st_coordinates` commands from `sf` in a series of `mutate` statements. First we extract the centroid from the geometry to a column we call `centroid`, and then we use `st_coordinates` to access the ordered list of centroid coordinates - using matrix notation to call the first item in the list as the `X` and second as the `Y`. 
+- We use the `st_centroid` and `st_coordinates` commands from `sf` in a series of `mutate` statements. First we extract the centroid from the geometry to a column we call `centroid`, and then we use `st_coordinates` to access the ordered list of centroid coordinates - using matrix notation (eg [,1]) to call the first item in the list as the `X` and second as the `Y`. 
 
 - We pull out the variables we want for this analysis using `select`. Examine what we keep - some variables associated with the landscape and land use, and our Ozone lag from ArcGIS - `Ave_ozoneH`.
 
@@ -227,7 +217,7 @@ Can you make a second map that visualizes `sumDevelop`?
 ggplot() +
     geom_sf(data = epa2, aes(fill=HwyDensity)) + 
     scale_fill_viridis(name="Highway density") +
-    mapTheme
+    theme_void()
 ```
 
 
@@ -271,13 +261,12 @@ scatterplot_data <- training %>%
     ggplot(data = scatterplot_data, aes(x = Value, y = ozoneHigh)) +
       geom_point() +
       geom_smooth(method = "lm", se=FALSE) +
-      facet_wrap(~Variable, scales="free", ncol=5)
+      facet_wrap(~Variable, scales="free", ncol=5)+
+      theme_minimal()
 ```
 ## 5.2 Creating Models
 
-Let’s estimate a ‘kitchen sink’ regression with all of our variables **except** the spatial variables. Note the embedded use of `select` in the `lm` command where we remove the variables we don't want.
-
-Note that we take `training` and turn it from an `sf` to a data frame. This is because the `lm` command, wants a data frame. We use `select` to remove the variables we don't want.
+Let’s estimate a ‘kitchen sink’ regression with all of our variables **except** the spatial variables.
 
 ***Describe the summary and its goodness of fit - what are the significant variables? What are their coefficients and what does that mean? What is the r-squared value?***
 
@@ -285,9 +274,8 @@ Overall, what do we make of this model?
 
 
 ```{r}
-reg <- lm(ozoneHigh ~ ., data=training %>% 
-                                   as.data.frame() %>%
-                                   select(-Ave_ozoneH,-geometry,-training,-X,-Y))
+reg <- lm(ozoneHigh ~ HwyDensity + distWater + sumDevelop + sumForest + distI95 + Population + distCities, data=training)
+
 summary(reg)
 
 ```
@@ -300,9 +288,11 @@ Why is this happening?
 
 
 ```{r}
-reg2 <- lm(ozoneHigh ~ ., data=training %>% 
-                                   as.data.frame() %>%
-                                   select(-Ave_ozoneH,-geometry,-training))
+reg2 <- lm(ozoneHigh ~ HwyDensity + distWater + sumDevelop + 
+             sumForest + distI95 + Population + distCities +
+             X + Y, 
+           data=training)
+
 summary(reg2)
 ```
 
@@ -319,7 +309,8 @@ Let's add in our spatial lag.
 ggplot(training, aes(Ave_ozoneH, ozoneHigh)) +
  geom_point() +
  geom_smooth(method="lm",se=F) +
- labs(title="Ozone as a function of the spatial lag of ozone")
+ labs(title="Ozone as a function of the spatial lag of ozone")+
+  theme_minimal()
 ```
 Let’s make a new regression called `reg.lag` that includes spatial lag in the regression.
 
@@ -327,9 +318,10 @@ Let’s make a new regression called `reg.lag` that includes spatial lag in the 
 
 
 ```{r}
-reg.lag <- lm(ozoneHigh ~ ., data=training %>% 
-                                   as.data.frame() %>%
-                                   select(-geometry,-training))
+reg.lag <- lm(ozoneHigh ~ HwyDensity + distWater + sumDevelop + 
+             sumForest + distI95 + Population + distCities +
+             X + Y + Ave_ozoneH, 
+           data=training)
 summary(reg.lag)
 ```
 
@@ -354,10 +346,9 @@ training.summary <-
     mutate(reg1.Pred = predict(reg, .),
            reg2.Pred = predict(reg2, .),
            reg.lag.Pred = predict(reg.lag, .)) %>%
-    dplyr::select(c(ozoneHigh, starts_with("reg"))) %>%
+    dplyr::select(c(ozoneHigh, reg1.Pred, reg2.Pred, reg.lag.Pred)) %>%
     gather(Variable, Value, -ozoneHigh, -geometry) 
 
-training.summary
 ```
 
 Next, create three plots of predictions for observed. 
@@ -367,7 +358,8 @@ Which model looks most accurate?
 ```{r plot_training, message = FALSE, warning= FALSE}
 ggplot(data = training.summary, aes(y = Value, x =ozoneHigh)) + 
   geom_point() + geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~Variable, scales = "free")
+  facet_wrap(~Variable, scales = "free") +
+  theme_minimal()
 ```
 
 Finally, we calculate the Mean Absolute Error. 
@@ -379,7 +371,8 @@ Notice that `group_by` allows us to calculate the average error by each regressi
 ***Which model is the strongest?***
 
 ```{r}
-st_drop_geometry(training.summary) %>%
+training.summary %>%
+  as.data.frame() %>%
   mutate(absError = abs(ozoneHigh - Value)) %>%
   group_by(Variable) %>%
   summarize(MeanAbsoluteError = mean(absError))
@@ -396,7 +389,7 @@ ggplot() +
   geom_sf(data=epa2, aes(fill = reg.lag.pred)) + 
   scale_fill_viridis() +
   labs(title="Predicted ozone") +
-  mapTheme
+  theme_void()
 ```
 Let’s visualize the prediction with the areas where we have air sensors (ie. training == 1). 
 
@@ -409,7 +402,7 @@ ggplot() +
   geom_sf(data = st_centroid(filter(epa2, training == 1)), colour="black") +
   scale_fill_viridis() +
   labs(title="Predicted ozone") +
-  mapTheme
+  theme_void()
 ```
 
 # 6. Questions
@@ -468,19 +461,19 @@ epa_joined <- epa %>% left_join(., tables_joined, by = c("FID_1" = "FID"))
 grid.arrange(ggplot() +
     geom_sf(data = epa_joined, aes(fill=Ave_ozoneH), color = "transparent") + 
     scale_fill_viridis(name="Spatial Lag") +
-    mapTheme,
+    theme_void(),
     ggplot() +
     geom_sf(data = epa_joined, aes(fill=idw_pred), color = "transparent") + 
     scale_fill_viridis(name="IDW") +
-    mapTheme,
+    theme_void(),
     ggplot() +
     geom_sf(data = epa_joined, aes(fill=krige_pred), color = "transparent") + 
     scale_fill_viridis(name="Kriging") +
-    mapTheme,
+    theme_void(),
     ggplot() +
   geom_sf(data=epa2, aes(fill = reg.lag.pred), color = "transparent") + 
   scale_fill_viridis(name="Regression") +
-  mapTheme,
+  theme_void(),
     ncol=2)
 ```
 

@@ -1,7 +1,7 @@
 ---
 title: "CPLN 675: Spatial Predictive Modeling for Classification"
 author: "Michael Fichman, University of Pennsylvania"
-date: "2/14/2025"
+date: "3/5/2025"
 output:
   html_document:
     toc: true
@@ -19,11 +19,11 @@ library(knitr)
 
 # 1. Introduction
 
-Recall our site suitability exercise in Week 1 - we used our own spatial decision factors, or "weights" to impose a rule-based system for identifying land areas. We are going to learn an alternative approach, where we use a statistical model to algorithmically determine the weights and subsequent siting.
+Recall our site suitability exercise in Week 1 - we used our own spatial decision factors, or "weights" to impose a rule-based system for identifying land areas. We are going to learn an alternative approach, where we use a statistical model to algorithmically determine the weights and use these to predict suitability.
 
-If you have never used logistic regression, or "logit" modeling, make sure you read the class tutorial *Introduction to Applied Predictive Modeling* to see the basic workflow for training and testing models.
+If you have never used logistic regression, or "logit" modeling, make sure you read the class text [*Introduction to Applied Predictive Modeling*](https://mafichman.github.io/applied_predictive_modeling/) to see the basic workflow for training and testing models.
 
-The use case is as follows - assume you are a program manager at a land conservation non-profit, and you are seeking to use your resources to acquire land to conserve. Given all the land in Pennsylvania, it's hard know where to start, so you need to find a way to identify suitable areas to investigate for acquisition. By using a predictive model, you can identify likely lands and begin to research their ownership, and determine whether they are available.
+The use case is as follows - assume you are a program manager at a land conservation non-profit, and you are seeking to use your resources to acquire land to conserve. Given all the land in Pennsylvania, it's hard know where to start. It is very labor intensive to inquire about properties, so you need to find a way to identify and porioritize suitable areas to investigate for acquisition. By using a predictive model, you can identify likely lands and begin to research their ownership, and determine whether they are available.
 
 This is a relatively simplified exercise - there are some detailed ways to "tune" models to make them more powerful and flexible - to introduce you to logistic regression as a tool for classification. You will be able to use this general workflow in your midterm project, when you will create your own features for a similar model.
 
@@ -254,10 +254,9 @@ Let's look at the model output, we see that we have coefficients, and p-values, 
 We are not really interested in our coefficients other than their magnitude, directionality and p-value (generall). But for the record, the way the coefficients in a logistic regression are interpreted is different than in OLS - we are talking in terms of "odds" of an outcome occurring (in our case odds of land being preserved.). If we exponentiate the coefficient (`exp()`) we can interpret it as *all else equal* the exponentiated value being the increase or decrease in the odds of the outcome.
 
 ```{r firstModel, warining = FALSE, message = FALSE}
-preserveModel <- glm(preserve ~ ., 
-                    family="binomial"(link="logit"), data = preserveTrain %>%
-                                                            as.data.frame() %>%
-                                                            select(-geometry, -Id))
+preserveModel <- glm(preserve ~ elevation + slope + dSteepSlop + landCover + dUrban + distRivers, 
+                    family="binomial"(link="logit"), data = preserveTrain %>%                                                       as.data.frame())
+                    
 summary(preserveModel)
 
 ```
@@ -301,6 +300,8 @@ ggplot(testProbs, aes(x = pred, fill=as.factor(obs))) +
 *Now we have to figure out at which probability level do we wish to classify land as being preserved.  How do we make this decision?*
 
 Let’s (arbitrarily for now) choose 50% and then create a table of our correct and incorrect predictions, called a "confusion matrix". Below we set the reference to the observed preserved status, data to the predicted outcome, and make sure to state which factor level is the positive (ie. preserved) level. Note that `confusionMatrix` does not take numeric inputs, only factors.
+
+*Changing your threshold might give you a more accurate model and/or optimize against certain types of error. Watch what happens to the Accuracy and the confusion matrix when you change the threshold in the ifelse statement below.*
 
 ```{r confusion_matrix, message = FALSE, warning = FALSE}
 testProbs$predClass  = ifelse(testProbs$pred > .5 ,1,0)
@@ -590,7 +591,7 @@ ggplot() +
 
 # Appendix 3. Geoprocessing and data-wrangling vignettes
 
-In order to make other spatial variables for models you are building in R, you might find yourself wanting to summarize vector or raster information inside a fishnet.
+In order to make other spatial variables for models you are building in R, you might find yourself wanting to summarize vector or raster information inside a fishnet. The equivalent tool to do this in ArcGIS is "Zonal Statistics."
 
 Let's take our basic fishnet `preserve` from the earlier part of this exercise, and think about how we are going to wrangle some basic data into the fishnet and engineer some features.
 

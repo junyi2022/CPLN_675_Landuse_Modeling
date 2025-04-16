@@ -1,7 +1,7 @@
 ---
 title: "CPLN 6750: Estimating Ozone Pollution with Spatial Interpolation and Regression"
 author: "Michael Fichman"
-date: "2/14/2025"
+date: "2/27/2025"
 output:
   html_document:
     toc: true
@@ -18,6 +18,8 @@ library(knitr)
 
 
 ***This markdown is based on material created cooperatively with the late Prof. Ken Steif.***
+
+*The course text ["Introduction to Applied Predictive Modeling"](https://mafichman.github.io/applied_predictive_modeling/) contains sample workflows for linear and binomial predictive models and describes key terms and engineering strategies.*
 
 # 1. Introduction
 
@@ -179,26 +181,16 @@ ggplot() +
 
 In this section we’re going to build a regression model to predict ozone as a function of a set of independent variables or ‘features’. We start with a bit of data cleaning and exploration.
 
-For our first step, we are going to clean up our data a bit, and add centroid locations for each cell as X and Y coordinates.
+For our first step, we are going to clean up our data a bit.
 
-Feel free to run this code line by line to get a better sense of how it works. 
 
-- We create a new sf object called `epa2` by piping `epa` to a series of dplyr commands.
-
-- We use the `st_centroid` and `st_coordinates` commands from `sf` in a series of `mutate` statements. First we extract the centroid from the geometry to a column we call `centroid`, and then we use `st_coordinates` to access the ordered list of centroid coordinates - using matrix notation to call the first item in the list as the `X` and second as the `Y`. 
-
-- We pull out the variables we want for this analysis using `select`. Examine what we keep - some variables associated with the landscape and land use, and our Ozone lag from ArcGIS - `Ave_ozoneH`.
+- We create a new sf object called `epa2`. We pull out the variables we want for this analysis from `epa` using `select`. Examine what we keep - some variables associated with the landscape and land use, and our Ozone lag from ArcGIS - `Ave_ozoneH`.
 
 ```{r cbind_epa2, warning = FALSE, message = FALSE}
 epa2 <- epa %>%
-  mutate(
-        centroid = st_centroid(geometry), # Compute centroid for each geometry
-        X = st_coordinates(centroid)[, 1], # Extract X coordinate of the centroid
-        Y = st_coordinates(centroid)[, 2]  # Extract Y coordinate of the centroid
-     ) %>% 
-    dplyr::select(HwyDensity,distWater,sumDevelop,sumForest,
+  dplyr::select(HwyDensity,distWater,sumDevelop,sumForest,
            distI95,Population,distCities,training,
-           ozoneHigh,Ave_ozoneH, X, Y)
+           ozoneHigh,Ave_ozoneH)
 ```
 
 
@@ -238,7 +230,9 @@ This is done using the `gather` command to transform our data from wide to long 
 
 Let's walk through this code chunk in a narrative way:
 
-- We want to create a data frame called `scatterplot_data` that's only our independent and dependent variables, so we drop the column `training` using a `select` command and then we `st_drop_geometry` to get rid of the geometry column.
+- We want to create a data frame called `scatterplot_data` that's only our independent and dependent variables.
+
+- We convert `training` to a data frame (e.g. a flat file) using `as.data.frame`, and so we drop the columns `training` and `geometry` using a `select` command.
 
 - We `gather` our data into a long data set that consists of combinations of each column variable with `ozoneHigh`. Examine these data and see how they look.
 
@@ -247,14 +241,15 @@ Let's walk through this code chunk in a narrative way:
 
 ```{r}
 scatterplot_data <- training %>% 
-  dplyr::select(-training) %>%
-  st_drop_geometry() %>%
+  as.data.frame() %>%
+  dplyr::select(-training, -geometry) %>%
   gather(Variable, Value, -ozoneHigh)
 
-    ggplot(data = scatterplot_data, aes(x = Value, y = ozoneHigh)) +
-      geom_point() +
-      geom_smooth(method = "lm", se=FALSE) +
-      facet_wrap(~Variable, scales="free", ncol=5)
+    ggplot(data = scatterplot_data) +
+      geom_point(aes(x = Value, y = ozoneHigh)) +
+      geom_smooth(aes(x = Value, y = ozoneHigh), method = "lm", se=FALSE) +
+      facet_wrap(~Variable, scales="free", ncol=4)+
+      theme_minimal()
 ```
 ## 5.2 Creating Models
 
@@ -268,25 +263,10 @@ Overall, what do we make of this model?
 
 
 ```{r}
-reg <- lm(ozoneHigh ~ ., data=training %>% 
-                                   as.data.frame() %>%
-                                   select(-Ave_ozoneH,-geometry,-training,-X,-Y))
+reg <- lm(data=training, ozoneHigh ~ HwyDensity + distWater + sumDevelop + sumForest + distI95 + Population +
+            distCities)
 summary(reg)
 
-```
-
-Let's estimate a new model, this time with x and y included as predictors. 
-
-***What do you notice about their coefficients and p-values. What do you notice about the R-squared? ***
-
-Why is this happening?
-
-
-```{r}
-reg2 <- lm(ozoneHigh ~ ., data=training %>% 
-                                   as.data.frame() %>%
-                                   select(-Ave_ozoneH,-geometry,-training))
-summary(reg2)
 ```
 
 ## 5.3 Add the spatial lag
@@ -299,10 +279,11 @@ Let's add in our spatial lag.
 
 
 ```{r}
-ggplot(training, aes(Ave_ozoneH, ozoneHigh)) +
- geom_point() +
- geom_smooth(method="lm",se=F) +
- labs(title="Ozone as a function of the spatial lag of ozone")
+ggplot(data= training) +
+ geom_point(aes(x = Ave_ozoneH, y = ozoneHigh)) +
+ geom_smooth(aes(x = Ave_ozoneH, y = ozoneHigh), method="lm",se=F) +
+ labs(title="Ozone as a function of the spatial lag of ozone")+
+  theme_minimal()
 ```
 
 Let’s make a new regression called `reg.lag` that includes spatial lag in the regression.
@@ -311,9 +292,9 @@ Let’s make a new regression called `reg.lag` that includes spatial lag in the 
 
 
 ```{r}
-reg.lag <- lm(ozoneHigh ~ ., data=training %>% 
-                                   as.data.frame() %>%
-                                   select(-geometry,-training))
+reg.lag <- lm(data=training, ozoneHigh ~ HwyDensity + distWater + sumDevelop + sumForest + distI95 + Population +
+            distCities+ Ave_ozoneH)
+
 summary(reg.lag)
 ```
 
@@ -335,13 +316,13 @@ We use the `predict` function to use our model(s) to estimate an ozone value for
 ```{r}
 training.summary <-
   training %>% 
+  as.data.frame() %>%
     mutate(reg1.Pred = predict(reg, .),
-           reg2.Pred = predict(reg2, .),
            reg.lag.Pred = predict(reg.lag, .)) %>%
-    dplyr::select(c(ozoneHigh, starts_with("reg"))) %>%
-    gather(Variable, Value, -ozoneHigh, -geometry) 
+    dplyr::select(ozoneHigh, reg1.Pred, reg.lag.Pred) %>%
+    gather(Variable, Value, -ozoneHigh) 
 
-training.summary
+glimpse(training.summary)
 ```
 
 Next, create three plots of predictions for observed. 
@@ -349,21 +330,28 @@ Next, create three plots of predictions for observed.
 Which model looks most accurate?
 
 ```{r plot_training, message = FALSE, warning= FALSE}
-ggplot(data = training.summary, aes(y = Value, x =ozoneHigh)) + 
-  geom_point() + geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~Variable, scales = "free")
+ggplot(data = training.summary) + 
+  geom_point(aes(y = Value, x =ozoneHigh)) + 
+  geom_smooth(aes(y = Value, x = ozoneHigh), method = "lm", se = FALSE) +
+  facet_wrap(~Variable, scales = "free")+
+  theme_minimal()
 ```
 
 Finally, we calculate the Mean Absolute Error. 
 
-`absError` is the absolute value of the difference between observed ozoneHigh and the predicted. Why do you think we are interested in absolute error rather than raw error?
+`absError` is the absolute value of the difference between observed ozoneHigh and the predicted. 
 
 Notice that `group_by` allows us to calculate the average error by each regression type. 
 
+*Why do you think we are interested in absolute error rather than raw error?*
+
 ***Which model is the strongest?***
 
+*Can you calculate `training.summary` and create MAPE in the mutate statement?*
+
 ```{r}
-st_drop_geometry(training.summary) %>%
+training.summary %>%
+  as.data.frame() %>%
   mutate(absError = abs(ozoneHigh - Value)) %>%
   group_by(Variable) %>%
   summarize(MeanAbsoluteError = mean(absError))
@@ -374,10 +362,15 @@ Finally, let’s predict for the entire dataset.
 
 This set of predictions is our interpolated output.
 
+We use the `predict` function to predict values for `epa2` using our model `reg.lag` and the independent variables in the `epa2` data set.
+
 ```{r}
 epa2 <- epa2 %>%
   mutate(reg.lag.pred = predict(reg.lag, epa2))
+```
 
+
+```{r}
 ggplot() +
   geom_sf(data=epa2, aes(fill = reg.lag.pred)) + 
   scale_fill_viridis() +
@@ -388,7 +381,7 @@ ggplot() +
 
 Let’s visualize the prediction with the areas where we have air sensors (ie. training == 1). 
 
-We use the `predict` function to predict values for `epa2` using our model `reg.lag` and the independent variables in the `epa2` data set.
+Notice how we can filter our data set `epa2` inside the ggplot call - this is a nice shortcut to keep us from having to make a whole new data frame.
 
 ```{r}
 
