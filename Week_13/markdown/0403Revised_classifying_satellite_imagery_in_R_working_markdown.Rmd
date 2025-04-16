@@ -44,8 +44,7 @@ band11 <- raster("https://raw.githubusercontent.com/mafichman/CPLN_675/main/Week
 
 ```{r or if you downloaded repo then load the bands locally}
 # Or, if you downloaded repo, you can load the bands locally. Uncomment the lines below to do so.
-path <- "E:/UPenn/24Spring/CPLN675/repo/Week_13/data/"
-
+path <- "C:/JunyiYang/UPenn/Spring_2025/landuse_modeling/CPLN_675_Landuse_Modeling/Week_13/data/"
 band1 <- raster(paste0(path, "band1.tif"))
 band2 <- raster(paste0(path, "band2.tif"))
 band3 <- raster(paste0(path, "band3.tif"))
@@ -165,7 +164,7 @@ points <- viewRGB(image, r = 4, g = 3, b = 2) %>% editMap()
 
 ```{r}
 # save as clouds after first iteration
-clouds <- points$finished$geometry %>% st_sf() %>% mutate(class = "clouds", id = 1)
+developed <- points$finished$geometry %>% st_sf() %>% mutate(class = "developed", id = 1)
 ```
 
 Do this repeatedly for `water`, `developed`, `undeveloped` and then bind them together and call them `training_points`
